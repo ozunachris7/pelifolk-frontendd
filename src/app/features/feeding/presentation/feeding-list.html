@@ -1,0 +1,677 @@
+<div class="mx-auto max-w-6xl">
+  <div class="flex flex-wrap items-end justify-between gap-5 pb-7">
+    <div>
+      <p class="mb-3 text-xs text-stone-500">Mi rancho / Alimentación</p>
+      <h1 class="text-2xl font-medium tracking-tight sm:text-3xl">
+        Alimentación
+      </h1>
+      <p class="mt-3 text-sm text-stone-500">
+        Alimentos, precios y consumo del hato.
+      </p>
+    </div>
+    @if (canWrite()) {
+    <button
+      type="button"
+      data-testid="new-feeding"
+      (click)="tab() === 'feeds' ? openFeed() : openConsumption()"
+      class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950 inline-flex items-center gap-2"
+    >
+      <lucide-icon [img]="plus" [size]="16" />{{ tab() === 'feeds' ? 'Agregar
+      alimento' : 'Registrar consumo' }}
+    </button>
+    }
+  </div>
+  @if (success()) {
+  <p
+    role="status"
+    class="mb-5 rounded-lg bg-green-50 p-4 text-sm text-green-900 dark:bg-green-950/30 dark:text-green-200"
+  >
+    {{ success() }}
+  </p>
+  } @if (!canRead()) {
+  <p class="py-10 text-sm text-stone-500">
+    No tienes permiso para consultar Alimentación.
+  </p>
+  } @else {
+  <div
+    class="mb-6 flex gap-6 border-b border-stone-200 text-sm dark:border-white/10"
+  >
+    @for (t of ['consumptions', 'feeds']; track t) {
+    <button
+      type="button"
+      [attr.data-tab]="t"
+      (click)="switchTab($any(t))"
+      [attr.aria-pressed]="tab() === t"
+      [class.border-green-800]="tab() === t"
+      [class.dark:border-green-300]="tab() === t"
+      [class.border-transparent]="tab() !== t"
+      class="border-b-2 py-3"
+    >
+      {{ t === 'feeds' ? 'Alimentos y precios' : 'Consumos' }}
+    </button>
+    }
+  </div>
+  @if (tab() === 'consumptions' && historyTarget(); as history) {
+  <div
+    class="mb-5 flex flex-wrap items-center justify-between gap-3 border-l-2 border-green-800 pl-4"
+  >
+    <p class="text-sm">
+      Historial de {{ history.kind === 'animal' ? 'animal' : 'lote' }}: {{
+      label(history.target) }}
+    </p>
+    <button type="button" (click)="clearHistory()" class="text-xs underline">
+      Ver todos los consumos
+    </button>
+  </div>
+  }
+  <form
+    [formGroup]="search"
+    (ngSubmit)="load()"
+    class="mb-6 flex flex-wrap items-end gap-3"
+    aria-label="Buscar alimentación"
+  >
+    <div class="min-w-0 flex-1 basis-60">
+      <label for="feeding-search" class="mb-2 block text-xs">Buscar</label
+      ><input
+        id="feeding-search"
+        type="search"
+        formControlName="q"
+        maxlength="100"
+        [placeholder]="tab() === 'feeds' ? 'Nombre del alimento' : 'Alimento, animal o lote'"
+        class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]"
+      />
+    </div>
+    @if (tab() === 'consumptions') {
+    <div>
+      <label for="feeding-from" class="mb-2 block text-xs">Desde</label
+      ><input
+        id="feeding-from"
+        type="date"
+        formControlName="date_from"
+        class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717] min-w-0"
+      />
+    </div>
+    <div>
+      <label for="feeding-to" class="mb-2 block text-xs">Hasta</label
+      ><input
+        id="feeding-to"
+        type="date"
+        formControlName="date_to"
+        class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717] min-w-0"
+      />
+    </div>
+    }
+    <button
+      type="submit"
+      [disabled]="loading() || search.invalid"
+      class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950"
+    >
+      Buscar
+    </button>
+  </form>
+  @if (error()) {
+  <p role="alert" class="mb-4 text-sm text-red-600">{{ error() }}</p>
+  <button type="button" (click)="load()" class="text-sm underline">
+    Reintentar
+  </button>
+  } @if (loading()) {
+  <p role="status" class="py-12 text-sm text-stone-500">
+    Cargando Alimentación…
+  </p>
+  } @else if (!error()) { @if (tab() === 'feeds') {
+  <div
+    class="overflow-x-auto rounded-xl border border-stone-200 dark:border-white/10"
+  >
+    <table class="w-full text-left text-sm">
+      <thead class="bg-stone-50 text-xs text-stone-500 dark:bg-white/5">
+        <tr>
+          <th class="p-4 font-normal">Alimento</th>
+          <th class="p-4 font-normal">Unidad</th>
+          <th class="p-4 font-normal">Precio vigente</th>
+          <th class="p-4 text-right font-normal">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (feed of feedPage().items; track feed.id) {
+        <tr
+          [attr.data-feed-id]="feed.id"
+          class="border-t border-stone-100 dark:border-white/10"
+        >
+          <td class="p-4 font-medium">{{ feed.name }}</td>
+          <td class="p-4">{{ unitLabel(feed.unit_code) }}</td>
+          <td class="whitespace-nowrap p-4">
+            @if (feed.current_unit_cost != null) {
+            <p class="font-medium">
+              {{ feed.current_unit_cost | currency: 'MXN' : 'symbol' : '1.2-4'
+              }} / {{ unitLabel(feed.unit_code) }}
+            </p>
+            <p class="mt-1 text-xs text-stone-500">
+              Desde {{ feed.current_price_from | date: 'dd/MM/yyyy' : 'UTC' }}
+            </p>
+            } @else {
+            <span class="text-stone-500">Sin precio vigente</span>
+            }
+          </td>
+          <td class="p-4">
+            <div class="flex justify-end gap-2">
+              <button
+                type="button"
+                (click)="openPrices(feed)"
+                [attr.aria-label]="'Precios de ' + feed.name"
+                class="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-green-900 dark:text-green-300"
+              >
+                <lucide-icon [img]="coins" [size]="17" />Precios
+              </button>
+              @if (canWrite()) {
+              <button
+                type="button"
+                (click)="openFeed(feed)"
+                [attr.aria-label]="'Editar alimento ' + feed.name"
+                class="rounded-lg p-2 text-stone-500 hover:bg-stone-100 dark:hover:bg-white/5"
+              >
+                <lucide-icon [img]="pencil" [size]="17" />
+              </button>
+              }
+            </div>
+          </td>
+        </tr>
+        } @empty {
+        <tr>
+          <td colspan="4" class="p-12 text-center text-stone-500">
+            No hay alimentos para estos filtros.
+          </td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <div
+    class="mt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-stone-500"
+  >
+    <p>{{ feedPage().total }} alimentos</p>
+    <div class="flex gap-3">
+      <button
+        type="button"
+        [disabled]="feedPage().offset === 0"
+        (click)="load(feedPage().offset - 25)"
+        class="rounded-lg border border-stone-200 px-3 py-2 disabled:opacity-40 dark:border-white/10"
+      >
+        Anterior</button
+      ><button
+        type="button"
+        [disabled]="feedPage().offset + 25 >= feedPage().total"
+        (click)="load(feedPage().offset + 25)"
+        class="rounded-lg border border-stone-200 px-3 py-2 disabled:opacity-40 dark:border-white/10"
+      >
+        Siguiente
+      </button>
+    </div>
+  </div>
+  } @else {
+  <div
+    class="mb-6 flex flex-wrap items-baseline justify-between gap-3 border-y border-stone-200 py-5 dark:border-white/10"
+  >
+    <p class="text-xs text-stone-500">
+      Costo de todos los consumos que coinciden con los filtros
+    </p>
+    <p class="text-xl font-medium">
+      {{ consumptionPage().total_cost | currency: 'MXN' : 'symbol' : '1.2-2' }}
+    </p>
+  </div>
+  @if (consumptionPage().unpriced_count) {
+  <p class="mb-4 text-sm text-amber-700 dark:text-amber-300">
+    {{ consumptionPage().unpriced_count }} registros históricos sin precio
+    vigente. Su costo no se incluye en el total.
+  </p>
+  }
+  <div
+    class="overflow-x-auto rounded-xl border border-stone-200 dark:border-white/10"
+  >
+    <table class="w-full text-left text-sm">
+      <thead class="bg-stone-50 text-xs text-stone-500 dark:bg-white/5">
+        <tr>
+          <th class="p-4 font-normal">Fecha / destino</th>
+          <th class="p-4 font-normal">Alimento</th>
+          <th class="p-4 font-normal">Cantidad</th>
+          <th class="p-4 text-right font-normal">Costo</th>
+          <th class="p-4 text-right font-normal">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (record of consumptionPage().items; track record.id) {
+        <tr
+          [attr.data-consumption-id]="record.id"
+          class="border-t border-stone-100 dark:border-white/10"
+        >
+          <td class="p-4">
+            <p class="whitespace-nowrap">
+              {{ record.date | date: 'dd/MM/yyyy' : 'UTC' }}
+            </p>
+            <p class="mt-1 text-xs text-stone-500">
+              {{ record.animal ? 'Animal' : 'Lote' }} · {{
+              label($any(record.animal || record.group)) }}
+            </p>
+          </td>
+          <td class="p-4">{{ record.feed.name }}</td>
+          <td class="whitespace-nowrap p-4">
+            {{ record.quantity | number: '1.0-2' }} {{
+            unitLabel(record.feed.unit_code) }}
+          </td>
+          <td class="whitespace-nowrap p-4 text-right font-medium">
+            {{ record.cost !== null ? (record.cost | currency: 'MXN' : 'symbol'
+            : '1.2-2') : 'Sin precio' }}
+          </td>
+          <td class="p-4">
+            <div class="flex justify-end gap-2">
+              <button
+                type="button"
+                (click)="detail.set(record)"
+                aria-label="Ver consumo"
+                class="rounded-lg p-2 text-stone-500 hover:bg-stone-100 dark:hover:bg-white/5"
+              >
+                <lucide-icon [img]="eye" [size]="17" /></button
+              ><button
+                type="button"
+                (click)="
+                          history(
+                            record.animal ? 'animal' : 'group',
+                            $any(record.animal || record.group)
+                          )
+                        "
+                aria-label="Historial de consumo"
+                class="rounded-lg p-2 text-stone-500 hover:bg-stone-100 dark:hover:bg-white/5"
+              >
+                <lucide-icon [img]="clock" [size]="17" />
+              </button>
+            </div>
+          </td>
+        </tr>
+        } @empty {
+        <tr>
+          <td colspan="5" class="p-12 text-center text-stone-500">
+            No hay consumos para estos filtros.
+          </td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <div
+    class="mt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-stone-500"
+  >
+    <p>{{ consumptionPage().total }} consumos</p>
+    <div class="flex gap-3">
+      <button
+        type="button"
+        [disabled]="consumptionPage().offset === 0"
+        (click)="load(consumptionPage().offset - 25)"
+        class="rounded-lg border border-stone-200 px-3 py-2 disabled:opacity-40 dark:border-white/10"
+      >
+        Anterior</button
+      ><button
+        type="button"
+        [disabled]="consumptionPage().offset + 25 >= consumptionPage().total"
+        (click)="load(consumptionPage().offset + 25)"
+        class="rounded-lg border border-stone-200 px-3 py-2 disabled:opacity-40 dark:border-white/10"
+      >
+        Siguiente
+      </button>
+    </div>
+  </div>
+  } } }
+</div>
+@if (modal() === 'feed') {
+<app-modal
+  [title]="editingFeed() ? 'Editar alimento' : 'Agregar alimento'"
+  [busy]="busy()"
+  (dismiss)="closeForm()"
+  ><form [formGroup]="feedForm" (ngSubmit)="saveFeed()">
+    <fieldset [disabled]="busy()" class="min-w-0 space-y-5">
+      <div>
+        <label for="feed-name" class="mb-2 block text-xs">Nombre *</label
+        ><input
+          id="feed-name"
+          formControlName="name"
+          maxlength="150"
+          class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]"
+        />
+      </div>
+      <div>
+        <label for="feed-unit" class="mb-2 block text-xs">Unidad *</label
+        ><select
+          id="feed-unit"
+          formControlName="unit_id"
+          class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]"
+        >
+          <option [ngValue]="0">Selecciona una unidad</option>
+          @for (unit of units(); track unit.id) {
+          <option [ngValue]="unit.id">{{ unitLabel(unit.code) }}</option>
+          }
+        </select>
+        <p class="mt-2 text-xs leading-5 text-stone-500">
+          La unidad se conserva una vez que hay precios o consumos registrados.
+        </p>
+      </div>
+      @if (!editingFeed()) {
+      <div
+        [formGroup]="priceForm"
+        class="space-y-5 border-t border-stone-200 pt-5 dark:border-white/10"
+      >
+        <div>
+          <label for="initial-price-date" class="mb-2 block text-xs"
+            >Precio vigente desde *</label
+          >
+          <input
+            id="initial-price-date"
+            type="date"
+            formControlName="effective_from"
+            class="w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]"
+          />
+        </div>
+        <div>
+          <label for="initial-price-cost" class="mb-2 block text-xs"
+            >Precio por unidad (MXN) *</label
+          >
+          <input
+            id="initial-price-cost"
+            type="number"
+            min="0"
+            step="0.0001"
+            formControlName="unit_cost"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]"
+          />
+          <p class="mt-2 text-xs leading-5 text-stone-500">
+            Usa la unidad seleccionada: por kg, saco o paca. Los cambios
+            posteriores se agregan desde Precios.
+          </p>
+        </div>
+        @if (priceForm.invalid && priceForm.touched) {
+        <p role="alert" class="text-sm text-red-600">
+          Indica fecha y precio válido, con hasta cuatro decimales.
+        </p>
+        }
+      </div>
+      } @if (optionsLoading()) {
+      <p role="status" class="text-xs text-stone-500">Cargando unidades…</p>
+      } @if (feedForm.invalid && feedForm.touched) {
+      <p role="alert" class="text-sm text-red-600">Indica nombre y unidad.</p>
+      } @if (formError()) {
+      <p role="alert" class="text-sm text-red-600">{{ formError() }}</p>
+      }
+      <div
+        class="flex justify-end gap-3 border-t border-stone-200 pt-5 dark:border-white/10"
+      >
+        <button type="button" (click)="closeForm()" class="px-4 py-3 text-xs">
+          Cancelar</button
+        ><button
+          type="submit"
+          [disabled]="!optionsReady()"
+          class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950"
+        >
+          {{ busy() ? 'Guardando…' : 'Guardar alimento' }}
+        </button>
+      </div>
+    </fieldset>
+  </form></app-modal
+>
+} @if (pricesFeed(); as feed) {
+<app-modal
+  title="Precios del alimento"
+  [busy]="busy()"
+  (dismiss)="closePrices()"
+  ><p class="text-lg font-medium">{{ feed.name }}</p>
+  <p class="mt-2 text-xs text-stone-500">
+    Importes en MXN por {{ unitLabel(feed.unit_code) }}.
+  </p>
+  @if (pricesLoading()) {
+  <p role="status" class="py-8 text-sm text-stone-500">Cargando precios…</p>
+  } @else {
+  <ol
+    class="my-6 space-y-4 border-l border-stone-200 pl-4 dark:border-white/10"
+  >
+    @for (price of prices(); track price.effective_from) {
+    <li>
+      <p class="text-sm font-medium">
+        {{ price.unit_cost | currency: 'MXN' : 'symbol' : '1.2-4' }} / {{
+        unitLabel(feed.unit_code) }}
+      </p>
+      <p class="mt-1 text-xs text-stone-500">
+        Desde {{ price.effective_from | date: 'dd/MM/yyyy' : 'UTC' }}
+      </p>
+    </li>
+    } @empty {
+    <li class="text-sm text-stone-500">Todavía no hay precios registrados.</li>
+    }
+  </ol>
+  } @if (canWrite()) {
+  <form [formGroup]="priceForm" (ngSubmit)="savePrice()">
+    <fieldset
+      [disabled]="busy()"
+      class="min-w-0 space-y-5 border-t border-stone-200 pt-5 dark:border-white/10"
+    >
+      <h3 class="text-sm font-medium">Agregar precio</h3>
+      <div>
+        <label for="feed-price-date" class="mb-2 block text-xs"
+          >Vigente desde *</label
+        ><input
+          id="feed-price-date"
+          type="date"
+          formControlName="effective_from"
+          class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717] min-w-0"
+        />
+      </div>
+      <div>
+        <label for="feed-price-cost" class="mb-2 block text-xs"
+          >Precio por {{ unitLabel(feed.unit_code) }} (MXN) *</label
+        ><input
+          id="feed-price-cost"
+          type="number"
+          formControlName="unit_cost"
+          min="0"
+          max="99999999.9999"
+          step="0.0001"
+          class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]"
+        />
+      </div>
+      <p class="text-xs leading-5 text-stone-500">
+        El precio aplica desde esa fecha hasta el siguiente precio. Agregar un
+        precio pasado recalcula los costos de los consumos de ese período.
+      </p>
+      @if (priceForm.invalid && priceForm.touched) {
+      <p role="alert" class="text-sm text-red-600">
+        Indica fecha y precio con hasta cuatro decimales.
+      </p>
+      }
+      <button
+        type="submit"
+        class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950"
+      >
+        {{ busy() ? 'Guardando…' : 'Guardar precio' }}
+      </button>
+    </fieldset>
+  </form>
+  } @if (priceError()) {
+  <p role="alert" class="mt-4 text-sm text-red-600">{{ priceError() }}</p>
+  }
+</app-modal>
+} @if (modal() === 'consumption') {
+<app-modal title="Registrar consumo" [busy]="busy()" (dismiss)="closeForm()"
+  ><form [formGroup]="consumptionForm" (ngSubmit)="saveConsumption()">
+    <fieldset [disabled]="busy()" class="min-w-0 space-y-5">
+      <div>
+        <label for="consumption-feed-search" class="mb-2 block text-xs"
+          >Buscar alimento</label
+        ><input
+          id="consumption-feed-search"
+          type="search"
+          [value]="feedSearch()"
+          (input)="feedSearch.set($any($event.target).value)"
+          maxlength="100"
+          class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]"
+        />
+      </div>
+      <div>
+        <label for="consumption-feed" class="mb-2 block text-xs"
+          >Alimento *</label
+        ><select
+          id="consumption-feed"
+          formControlName="feed_id"
+          (change)="selectedFeedId.set(consumptionForm.controls.feed_id.value)"
+          class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]"
+        >
+          <option value="">Selecciona un alimento</option>
+          @for (feed of feedOptions(); track feed.id) {
+          <option [value]="feed.id">
+            {{ feed.name }} · {{ unitLabel(feed.unit_code) }}
+          </option>
+          }
+        </select>
+      </div>
+      <div>
+        <label for="consumption-kind" class="mb-2 block text-xs"
+          >Registrar para</label
+        ><select
+          id="consumption-kind"
+          formControlName="target_kind"
+          (change)="targetChanged()"
+          class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]"
+        >
+          <option value="animal">Un animal</option>
+          <option value="group">Un lote</option>
+        </select>
+      </div>
+      <div>
+        <label for="consumption-target-search" class="mb-2 block text-xs"
+          >Buscar {{ consumptionForm.controls.target_kind.value === 'animal' ?
+          'animal' : 'lote' }}</label
+        >
+        <div class="flex gap-2">
+          <input
+            id="consumption-target-search"
+            type="search"
+            [value]="targetSearch()"
+            (input)="targetSearch.set($any($event.target).value)"
+            maxlength="100"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717] min-w-0"
+          /><button
+            type="button"
+            (click)="loadOptions()"
+            [disabled]="optionsLoading()"
+            class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950"
+          >
+            Buscar
+          </button>
+        </div>
+        <p class="mt-2 text-xs text-stone-500">
+          Hasta 100 alimentos y destinos por búsqueda.
+        </p>
+      </div>
+      <div>
+        <label for="consumption-target" class="mb-2 block text-xs"
+          >{{ consumptionForm.controls.target_kind.value === 'animal' ? 'Animal'
+          : 'Lote' }} *</label
+        ><select
+          id="consumption-target"
+          formControlName="target_id"
+          class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]"
+        >
+          <option value="">Selecciona un destino</option>
+          @for (target of targets(); track target.id) {
+          <option [value]="target.id">{{ label(target) }}</option>
+          }
+        </select>
+      </div>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label for="consumption-date" class="mb-2 block text-xs"
+            >Fecha *</label
+          ><input
+            id="consumption-date"
+            type="date"
+            formControlName="date"
+            [max]="today"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717] min-w-0"
+          />
+        </div>
+        <div>
+          <label for="consumption-quantity" class="mb-2 block text-xs"
+            >Cantidad {{ selectedFeed() ? '(' +
+            unitLabel($any(selectedFeed()).unit_code) + ')' : '' }} *</label
+          ><input
+            id="consumption-quantity"
+            type="number"
+            formControlName="quantity"
+            min="0.01"
+            max="99999999.99"
+            step="0.01"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]"
+          />
+        </div>
+      </div>
+      <p class="text-xs leading-5 text-stone-500">
+        Indica el total consumido por el animal o lote. El costo usa el precio
+        vigente en esa fecha; registra primero el precio del alimento.
+      </p>
+      @if (optionsLoading()) {
+      <p role="status" class="text-xs text-stone-500">Cargando opciones…</p>
+      } @if (consumptionForm.invalid && consumptionForm.touched) {
+      <p role="alert" class="text-sm text-red-600">
+        Completa alimento, destino, fecha y cantidad con hasta dos decimales.
+      </p>
+      } @if (formError()) {
+      <p role="alert" class="text-sm text-red-600">{{ formError() }}</p>
+      }
+      <div
+        class="flex justify-end gap-3 border-t border-stone-200 pt-5 dark:border-white/10"
+      >
+        <button type="button" (click)="closeForm()" class="px-4 py-3 text-xs">
+          Cancelar</button
+        ><button
+          type="submit"
+          [disabled]="!optionsReady()"
+          class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950"
+        >
+          {{ busy() ? 'Guardando…' : 'Guardar consumo' }}
+        </button>
+      </div>
+    </fieldset>
+  </form></app-modal
+>
+} @if (detail(); as record) {
+<app-modal title="Detalle del consumo" (dismiss)="detail.set(null)"
+  ><p class="text-lg font-medium">{{ record.feed.name }}</p>
+  <p class="mt-2 text-xs text-stone-500">
+    {{ record.date | date: 'dd/MM/yyyy' : 'UTC' }} · {{ record.animal ? 'Animal'
+    : 'Lote' }}: {{ label($any(record.animal || record.group)) }}
+  </p>
+  <dl class="mt-6 space-y-4 text-sm">
+    <div>
+      <dt class="mb-1 text-xs text-stone-500">Cantidad</dt>
+      <dd>
+        {{ record.quantity | number: '1.0-2' }} {{
+        unitLabel(record.feed.unit_code) }}
+      </dd>
+    </div>
+    <div>
+      <dt class="mb-1 text-xs text-stone-500">Precio vigente</dt>
+      <dd>
+        {{ record.unit_cost !== null ? (record.unit_cost | currency: 'MXN' :
+        'symbol' : '1.2-4') : 'Sin precio' }} / {{
+        unitLabel(record.feed.unit_code) }}
+      </dd>
+      @if (record.price_from) {
+      <p class="mt-1 text-xs text-stone-500">
+        Desde {{ record.price_from | date: 'dd/MM/yyyy' : 'UTC' }}
+      </p>
+      }
+    </div>
+    <div>
+      <dt class="mb-1 text-xs text-stone-500">Costo</dt>
+      <dd class="text-xl font-medium">
+        {{ record.cost !== null ? (record.cost | currency: 'MXN' : 'symbol' :
+        '1.2-2') : 'Sin precio' }}
+      </dd>
+    </div>
+  </dl></app-modal
+>
+}

@@ -1,0 +1,238 @@
+<section class="mx-auto max-w-6xl">
+  <p class="mb-3 text-xs text-stone-500">Mi rancho / Reportes / Pesajes</p>
+  <div class="mb-8 flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-semibold tracking-tight">Pesajes y crecimiento</h1>
+      <p class="mt-2 text-sm text-stone-500">
+        Evolución del peso y ganancia diaria de cada animal.
+      </p>
+    </div>
+    @if (allowed) {
+      <button
+        type="button"
+        (click)="export()"
+        [disabled]="exporting() || loading() || !!error()"
+        class="inline-flex items-center gap-2 rounded-lg bg-stone-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-white dark:text-stone-900">
+        <lucide-icon [img]="download" [size]="16" />{{
+          exporting() ? 'Preparando Excel…' : 'Descargar Excel'
+        }}
+      </button>
+    }
+  </div>
+  @if (!allowed) {
+    <p class="py-12 text-sm text-stone-500">No tienes permiso para consultar pesajes.</p>
+  } @else {
+    <form
+      [formGroup]="form"
+      (ngSubmit)="search()"
+      class="grid grid-cols-1 gap-4 border-y border-stone-200 py-6 sm:grid-cols-2 lg:grid-cols-3 dark:border-white/10">
+      <div class="min-w-0">
+        <label for="weight-report-q" class="mb-2 block text-xs">Nombre o SINIIGA</label
+        ><input
+          id="weight-report-q"
+          formControlName="q"
+          maxlength="100"
+          class="w-full min-w-0 rounded-lg border border-stone-300 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+      </div>
+      <div class="min-w-0">
+        <label for="weight-report-animal" class="mb-2 block text-xs">Animal</label
+        ><select
+          id="weight-report-animal"
+          formControlName="animal_id"
+          class="w-full min-w-0 rounded-lg border border-stone-300 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-stone-900">
+          <option value="">Todos</option>
+          @for (a of options(); track a.id) {
+            <option [value]="a.id">{{ label(a) }}</option>
+          }
+        </select>
+      </div>
+      <div class="min-w-0">
+        <label for="weight-report-from" class="mb-2 block text-xs">Desde</label
+        ><input
+          id="weight-report-from"
+          type="date"
+          formControlName="date_from"
+          class="w-full min-w-0 rounded-lg border border-stone-300 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+      </div>
+      <div class="min-w-0">
+        <label for="weight-report-to" class="mb-2 block text-xs">Hasta</label
+        ><input
+          id="weight-report-to"
+          type="date"
+          formControlName="date_to"
+          class="w-full min-w-0 rounded-lg border border-stone-300 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+      </div>
+      <div class="min-w-0 sm:col-span-2">
+        <label for="weight-report-animal-search" class="mb-2 block text-xs"
+          >Buscar animal en las opciones</label
+        >
+        <div class="flex min-w-0 gap-3">
+          <input
+            id="weight-report-animal-search"
+            [formControl]="animalSearch"
+            maxlength="100"
+            placeholder="Nombre o SINIIGA"
+            class="w-full min-w-0 rounded-lg border border-stone-300 bg-transparent px-3 py-3 text-sm dark:border-white/15" /><button
+            type="button"
+            (click)="loadOptions()"
+            [disabled]="optionsLoading()"
+            class="rounded-lg border border-stone-300 px-4 text-xs disabled:opacity-50 dark:border-white/15">
+            {{ optionsLoading() ? 'Buscando…' : 'Buscar' }}
+          </button>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-4 sm:col-span-2 lg:col-span-3">
+        <button
+          type="submit"
+          [disabled]="loading()"
+          class="rounded-lg border border-stone-300 px-4 py-2 text-xs disabled:opacity-50 dark:border-white/15">
+          Aplicar filtros</button
+        ><button
+          type="button"
+          (click)="reset()"
+          class="text-xs text-stone-500 underline underline-offset-4">
+          Limpiar filtros</button
+        ><span class="text-xs text-stone-500">Sin fechas se consulta todo el historial.</span>
+      </div>
+    </form>
+    @if (optionError()) {
+      <p role="alert" class="mt-4 text-sm text-amber-700 dark:text-amber-400">
+        {{ optionError() }}
+        <button type="button" (click)="loadOptions()" class="underline">Reintentar</button>
+      </p>
+    }
+    @if (exportError()) {
+      <p role="alert" class="mt-4 text-sm text-red-700 dark:text-red-400">{{ exportError() }}</p>
+    }
+    @if (error()) {
+      <p role="alert" class="mt-6 text-sm text-red-700 dark:text-red-400">
+        {{ error() }} <button type="button" (click)="load()" class="underline">Reintentar</button>
+      </p>
+    }
+    @if (loading()) {
+      <p class="py-12 text-sm text-stone-500" role="status">Cargando reporte…</p>
+    } @else if (!error()) {
+      <div class="my-6 flex flex-wrap justify-between gap-3 text-xs text-stone-500">
+        <p>
+          Período:
+          {{
+            page().date_from ? (page().date_from | date: 'dd/MM/yyyy') : 'Inicio del historial'
+          }}
+          — {{ page().date_to ? (page().date_to | date: 'dd/MM/yyyy') : 'Sin límite' }}
+        </p>
+        <p>Consulta al {{ page().as_of | date: 'dd/MM/yyyy' }}</p>
+      </div>
+      <div
+        data-testid="weight-summary"
+        class="mb-5 grid grid-cols-2 gap-x-6 gap-y-5 border-b border-stone-200 pb-6 sm:grid-cols-4 dark:border-white/10">
+        <div>
+          <p class="text-xs text-stone-500">Pesajes filtrados</p>
+          <p class="mt-2 text-2xl font-semibold tabular-nums">{{ page().total }}</p>
+        </div>
+        <div>
+          <p class="text-xs text-stone-500">Animales</p>
+          <p class="mt-2 text-2xl font-semibold tabular-nums">{{ page().animal_count }}</p>
+        </div>
+        <div>
+          <p class="text-xs text-stone-500">Intervalos comparables</p>
+          <p class="mt-2 text-2xl font-semibold tabular-nums">{{ page().comparable_count }}</p>
+        </div>
+        <div>
+          <p class="text-xs text-stone-500">Pesajes con pérdida</p>
+          <p class="mt-2 text-2xl font-semibold tabular-nums">{{ page().loss_count }}</p>
+        </div>
+      </div>
+      <p class="mb-6 text-xs leading-relaxed text-stone-500">
+        Cada registro se compara con el pesaje anterior del mismo animal, incluso si queda fuera del
+        período. Ganancia diaria = cambio de peso ÷ días entre mediciones. El primer pesaje no tiene
+        comparación; un valor negativo indica pérdida. Los totales incluyen todas las páginas.
+      </p>
+      <div class="min-w-0 overflow-x-auto rounded-xl border border-stone-200 dark:border-white/10">
+        <table class="w-full min-w-[1050px] text-left text-sm">
+          <thead class="bg-stone-50 text-xs text-stone-500 dark:bg-white/5">
+            <tr>
+              <th class="p-4 font-normal">Fecha / animal</th>
+              <th class="p-4 text-right font-normal">Peso</th>
+              <th class="p-4 font-normal">Pesaje anterior</th>
+              <th class="p-4 text-right font-normal">Días</th>
+              <th class="p-4 text-right font-normal">Cambio</th>
+              <th class="p-4 text-right font-normal">Ganancia diaria</th>
+              <th class="p-4 font-normal">Registro</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of page().items; track r.id) {
+              <tr data-weight-row class="border-t border-stone-200 align-top dark:border-white/10">
+                <td class="p-4">
+                  <p class="whitespace-nowrap">{{ r.date | date: 'dd/MM/yyyy' }}</p>
+                  <p class="mt-1 text-xs text-stone-500">{{ label(r.animal) }}</p>
+                </td>
+                <td class="whitespace-nowrap p-4 text-right tabular-nums">
+                  {{ r.weight_kg | number: '1.0-2' }} kg
+                </td>
+                <td class="p-4">
+                  @if (r.previous_date) {
+                    <p class="whitespace-nowrap">{{ r.previous_date | date: 'dd/MM/yyyy' }}</p>
+                    <p class="mt-1 text-xs text-stone-500">
+                      {{ r.previous_weight_kg | number: '1.0-2' }} kg
+                    </p>
+                  } @else {
+                    <span class="text-xs text-stone-500">Primer pesaje</span>
+                  }
+                </td>
+                <td class="p-4 text-right tabular-nums">{{ r.days ?? '—' }}</td>
+                <td class="whitespace-nowrap p-4 text-right tabular-nums">
+                  @if (r.gain_kg !== null) {
+                    {{ r.gain_kg | number: '1.0-2' }} kg
+                  } @else {
+                    <span class="text-stone-500">—</span>
+                  }
+                </td>
+                <td class="whitespace-nowrap p-4 text-right tabular-nums">
+                  @if (r.daily_gain_kg !== null) {
+                    {{ r.daily_gain_kg | number: '1.3-3' }} kg/día
+                  } @else {
+                    <span class="text-xs text-stone-500">Sin comparación</span>
+                  }
+                </td>
+                <td class="max-w-64 p-4">
+                  <p class="text-xs">{{ r.recorded_by }}</p>
+                  @if (r.notes) {
+                    <p class="mt-2 break-words text-xs text-stone-500">{{ r.notes }}</p>
+                  }
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="7" class="p-10 text-center text-sm text-stone-500">
+                  No hay pesajes que coincidan con los filtros.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <div class="mt-5 flex flex-wrap items-center justify-between gap-4 text-xs text-stone-500">
+        <p>El Excel incluye todos los pesajes de los filtros aplicados.</p>
+        <div class="flex items-center gap-4">
+          <span
+            >{{ page().total ? page().offset + 1 : 0 }}–{{ page().offset + page().items.length }} de
+            {{ page().total }}</span
+          ><button
+            type="button"
+            (click)="load(page().offset - page().limit)"
+            [disabled]="page().offset === 0"
+            class="disabled:opacity-40">
+            Anterior</button
+          ><button
+            type="button"
+            (click)="load(page().offset + page().limit)"
+            [disabled]="page().offset + page().limit >= page().total"
+            class="disabled:opacity-40">
+            Siguiente
+          </button>
+        </div>
+      </div>
+    }
+  }
+</section>

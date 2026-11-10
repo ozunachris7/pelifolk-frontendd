@@ -1,0 +1,95 @@
+<section
+  aria-labelledby="health-distribution-title"
+  class="min-w-0 border-y border-stone-200 py-7 dark:border-white/10">
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h2 id="health-distribution-title" class="text-base font-medium">
+        Casos sanitarios por estado
+      </h2>
+      <p class="mt-2 text-xs leading-5 text-stone-500">
+        Estado actual al {{ asOf() | date: 'dd/MM/yyyy' : 'UTC' }} · {{ health().total_cases }}
+        {{ health().total_cases === 1 ? 'caso registrado' : 'casos registrados' }}.
+      </p>
+    </div>
+    <a
+      routerLink="/dashboard/health"
+      class="rounded-lg border border-stone-200 px-3 py-2 text-xs dark:border-white/15"
+      >Ver Sanidad</a
+    >
+  </div>
+  @if (health().total_cases === 0) {
+    <p role="status" class="py-8 text-sm text-stone-500">
+      Todavía no hay casos sanitarios registrados para mostrar su distribución.
+    </p>
+  } @else {
+    <p class="mt-4 max-w-3xl text-xs leading-5 text-stone-500">
+      Incluye todos los casos registrados, independientemente de su fecha de inicio. Un animal puede
+      tener varios casos.
+    </p>
+    <div
+      class="mt-5 grid min-w-0 items-start gap-7 lg:grid-cols-[minmax(0,2fr)_minmax(240px,1fr)] lg:gap-10">
+      <div class="min-w-0">
+        <app-chart
+          [model]="model()"
+          label="Distribución de casos sanitarios: abiertos, en tratamiento y cerrados"
+          [selectedIndex]="selectedIndex()"
+          (selectIndex)="select($event)" />
+        @if (selected(); as row) {
+          <p
+            role="status"
+            aria-live="polite"
+            data-testid="health-selection"
+            class="mt-4 border-l-2 border-teal-700 py-3 pl-3 text-sm dark:border-teal-400">
+            <span class="font-medium">{{ row.label }}</span> · {{ row.count }}
+            {{ row.count === 1 ? 'caso' : 'casos' }} ·
+            {{ (row.count / health().total_cases) * 100 | number: '1.1-1' }} % del total
+          </p>
+        }
+      </div>
+      <div
+        class="min-w-0 border-t border-stone-200 pt-5 lg:border-l lg:border-t-0 lg:pl-7 lg:pt-0 dark:border-white/10">
+        <table class="w-full text-left text-xs">
+          <caption class="mb-3 text-left text-sm font-medium">
+            Cantidad y porcentaje por estado
+          </caption>
+          <thead class="border-b border-stone-200 text-stone-500 dark:border-white/10">
+            <tr>
+              <th scope="col" class="py-3 font-medium">Estado</th>
+              <th scope="col" class="px-2 py-3 text-right font-medium">Casos</th>
+              <th scope="col" class="py-3 text-right font-medium">%</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-stone-200 dark:divide-white/10">
+            @for (row of rows(); track row.label) {
+              <tr>
+                <th scope="row" class="py-4 font-normal">
+                  <span class="inline-flex items-center gap-2"
+                    ><span
+                      aria-hidden="true"
+                      [class]="'h-2.5 w-2.5 shrink-0 rounded-sm ' + row.marker"></span
+                    >{{ row.label }}</span
+                  >
+                </th>
+                <td class="px-2 py-4 text-right">{{ row.count }}</td>
+                <td class="whitespace-nowrap py-4 text-right">
+                  {{ (row.count / health().total_cases) * 100 | number: '1.1-1' }} %
+                </td>
+              </tr>
+            }
+          </tbody>
+          <tfoot class="border-t border-stone-200 font-medium dark:border-white/10">
+            <tr>
+              <th scope="row" class="py-4">Total</th>
+              <td class="px-2 py-4 text-right">{{ health().total_cases }}</td>
+              <td class="py-4 text-right">100 %</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+    <p class="mt-5 text-xs leading-5 text-stone-500">
+      Pasa el cursor o toca las barras para consultar cada estado. También puedes enfocar la gráfica
+      con Tab y usar las flechas izquierda y derecha.
+    </p>
+  }
+</section>

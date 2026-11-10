@@ -1,0 +1,298 @@
+@if (!canRead()) {
+  <p class="p-8 text-sm text-stone-500">No tienes permiso para consultar animales.</p>
+} @else {
+  <header class="mb-6 flex flex-wrap items-start justify-between gap-4">
+    <div>
+      <p class="text-xs uppercase tracking-widest text-stone-500">Mi rancho / Hato</p>
+      <h1 class="mt-2 text-2xl font-medium tracking-tight">Evaluaciones físicas</h1>
+      <p class="mt-3 max-w-2xl text-sm leading-6 text-stone-500">
+        Conformación y características observadas por animal, con fecha y evaluador. Registro
+        descriptivo, sin puntuación global.
+      </p>
+    </div>
+    @if (canWrite()) {
+      <button
+        type="button"
+        (click)="start()"
+        data-new-physical
+        class="rounded-lg bg-green-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-40 dark:bg-stone-100 dark:text-stone-950 inline-flex items-center gap-2">
+        <lucide-icon [img]="plus" [size]="16" />Registrar evaluación
+      </button>
+    }
+  </header>
+  <nav
+    aria-label="Gestión del hato"
+    class="mb-7 flex flex-wrap gap-7 border-b border-stone-200 text-sm dark:border-white/10">
+    <a routerLink="/dashboard/animals" class="pb-4 text-stone-500">Animales</a
+    ><a routerLink="/dashboard/breeds" class="pb-4 text-stone-500">Razas</a
+    ><a
+      routerLink="/dashboard/physical-evaluations"
+      aria-current="page"
+      class="border-b-2 border-green-800 pb-4 font-medium text-green-900 dark:border-green-200 dark:text-green-200"
+      >Evaluaciones físicas</a
+    >
+  <a routerLink="/dashboard/management-decisions" class="pb-4 text-stone-500">Decisiones vigentes</a>
+  </nav>
+  <form (submit)="$event.preventDefault(); load()" class="mb-6 flex flex-wrap items-end gap-3">
+    <div class="min-w-0 flex-1">
+      <label for="physical-search" class="mb-2 block text-xs"
+        >Buscar animal por nombre o SINIIGA</label
+      ><input
+        id="physical-search"
+        [value]="search()"
+        (input)="search.set($any($event.target).value)"
+        maxlength="100"
+        class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+    </div>
+    <button
+      type="submit"
+      class="rounded-lg bg-green-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-40 dark:bg-stone-100 dark:text-stone-950">
+      Buscar
+    </button>
+    @if (animalFilter()) {
+      <button type="button" (click)="animalFilter.set(''); load()" class="py-3 text-xs underline">
+        Quitar filtro de animal
+      </button>
+    }
+  </form>
+  @if (success()) {
+    <p role="status" class="mb-4 text-sm">{{ success() }}</p>
+  }
+  @if (error()) {
+    <p role="alert" class="mb-4 text-sm text-red-700 dark:text-red-300">
+      {{ error() }} <button type="button" (click)="load()" class="underline">Reintentar</button>
+    </p>
+  }
+  @if (loading()) {
+    <p role="status" class="py-10 text-sm text-stone-500">Cargando evaluaciones…</p>
+  } @else {
+    <div class="relative overflow-x-auto rounded-xl border border-stone-200 dark:border-white/10">
+      <table class="w-full text-left text-sm">
+        <thead class="border-b border-stone-200 text-xs text-stone-500 dark:border-white/10">
+          <tr>
+            <th class="p-4">Animal</th>
+            <th class="p-4">Fecha</th>
+            <th class="p-4">Evaluador</th>
+            <th class="p-4">Apartados descritos</th>
+            <th class="p-4">Acciones</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-stone-200 dark:divide-white/10">
+          @for (r of page().items; track r.id) {
+            <tr data-physical-row>
+              <td class="whitespace-nowrap p-4 font-medium">{{ label(r.animal) }}</td>
+              <td class="whitespace-nowrap p-4 text-xs">
+                {{ r.date | date: 'dd/MM/yyyy' : 'UTC' }}
+              </td>
+              <td class="p-4">{{ r.evaluated_by }}</td>
+              <td class="p-4 text-xs">
+                {{ count(r) }} de {{ r.findings.length
+                }}<span class="mt-1 block text-stone-500">Sin puntuación</span>
+              </td>
+              <td class="p-4">
+                <button
+                  type="button"
+                  (click)="detail.set(r)"
+                  class="rounded-lg border border-stone-200 px-4 py-3 text-sm dark:border-white/15 inline-flex items-center gap-2 whitespace-nowrap text-xs">
+                  <lucide-icon [img]="eye" [size]="15" />Ver evaluación
+                </button>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="5" class="p-8 text-center text-stone-500">
+                No hay evaluaciones con estos filtros.
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    @if (page().total > page().limit) {
+      <div class="mt-5 flex flex-wrap justify-end gap-4 text-xs">
+        <span
+          >{{ page().offset + 1 }}–{{ page().offset + page().items.length }} de
+          {{ page().total }}</span
+        ><button
+          type="button"
+          (click)="load(page().offset - page().limit)"
+          [disabled]="page().offset === 0"
+          class="disabled:opacity-40">
+          Anterior</button
+        ><button
+          type="button"
+          (click)="load(page().offset + page().limit)"
+          [disabled]="page().offset + page().limit >= page().total"
+          class="disabled:opacity-40">
+          Siguiente
+        </button>
+      </div>
+    }
+  }
+  <p class="mt-5 text-xs leading-5 text-stone-500">
+    Cada evaluación conserva las observaciones originales. No determina pureza racial, valor
+    genético ni aptitud reproductiva automáticamente.
+  </p>
+}
+@if (formOpen()) {
+  <app-modal title="Registrar evaluación física" [busy]="busy()" (dismiss)="dismiss()"
+    ><form [formGroup]="form" (ngSubmit)="save()" class="space-y-5">
+      <fieldset [disabled]="busy()" class="min-w-0 space-y-5">
+        <div>
+          <label for="physical-animal-search" class="mb-2 block text-xs">Buscar animal</label>
+          <div class="flex gap-2">
+            <input
+              id="physical-animal-search"
+              [value]="animalSearch()"
+              (input)="animalSearch.set($any($event.target).value)"
+              maxlength="100"
+              class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" /><button
+              type="button"
+              (click)="findAnimals()"
+              [disabled]="animalLoading()"
+              class="rounded-lg border border-stone-200 px-4 py-3 text-sm dark:border-white/15">
+              Buscar
+            </button>
+          </div>
+        </div>
+        <div>
+          <label for="physical-animal" class="mb-2 block text-xs">Animal *</label
+          ><select
+            id="physical-animal"
+            formControlName="animal_id"
+            class="w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+            <option value="">Selecciona el animal</option>
+            @for (a of animals(); track a.id) {
+              <option [value]="a.id">{{ label(a) }}</option>
+            }
+          </select>
+          @if (animalLoading()) {
+            <p role="status" class="mt-2 text-xs text-stone-500">Cargando animales…</p>
+          }
+          @if (optionsError()) {
+            <p role="alert" class="mt-2 text-xs text-red-700 dark:text-red-300">
+              {{ optionsError() }}
+            </p>
+          }
+        </div>
+        <div>
+          <label for="physical-date" class="mb-2 block text-xs">Fecha de evaluación *</label
+          ><input
+            id="physical-date"
+            type="date"
+            formControlName="date"
+            [max]="today"
+            class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+        </div>
+        <div>
+          <label for="physical-evaluator" class="mb-2 block text-xs">Evaluada por *</label
+          ><input
+            id="physical-evaluator"
+            formControlName="evaluated_by"
+            maxlength="190"
+            class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+          <p class="mt-2 text-xs leading-5 text-stone-500">
+            Nombre de quien revisó al animal. Tu sesión identificará por separado quién captura el
+            registro.
+          </p>
+        </div>
+        @if (rubricLoading()) {
+          <p role="status" class="text-xs text-stone-500">Cargando criterios…</p>
+        } @else if (!rubric()) {
+          <button
+            type="button"
+            (click)="loadRubric()"
+            class="rounded-lg border border-stone-200 px-4 py-3 text-sm dark:border-white/15">
+            Reintentar criterios
+          </button>
+        }
+        @if (rubric(); as rubric) {
+          <section
+            formGroupName="findings"
+            class="space-y-5 border-y border-stone-200 py-5 dark:border-white/10">
+            <div>
+              <h3 class="text-sm font-medium">Apartados de observación</h3>
+              <p class="mt-2 text-xs leading-5 text-stone-500">
+                Describe al menos uno. Deja vacíos los que no revisaste: se conservarán como Sin
+                evaluar. No se usan calificaciones numéricas.
+              </p>
+            </div>
+            @for (c of rubric.criteria; track c.code) {
+              <div>
+                <label [for]="'physical-' + c.code" class="mb-2 block text-sm font-medium">{{
+                  c.label
+                }}</label>
+                <p class="mb-3 text-xs leading-5 text-stone-500">{{ c.description }}</p>
+                <textarea
+                  [id]="'physical-' + c.code"
+                  [formControlName]="c.code"
+                  rows="3"
+                  maxlength="2000"
+                  class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15"></textarea>
+              </div>
+            }
+          </section>
+        }
+        <div>
+          <label for="physical-notes" class="mb-2 block text-xs"
+            >Observaciones generales (opcional)</label
+          ><textarea
+            id="physical-notes"
+            formControlName="notes"
+            rows="3"
+            maxlength="5000"
+            class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15"></textarea>
+        </div>
+        <div class="flex flex-wrap justify-end gap-3">
+          <button
+            type="button"
+            (click)="dismiss()"
+            class="rounded-lg border border-stone-200 px-4 py-3 text-sm dark:border-white/15">
+            Cancelar</button
+          ><button
+            type="submit"
+            [disabled]="!rubric() || rubricLoading()"
+            class="rounded-lg bg-green-900 px-4 py-3 text-sm font-medium text-white disabled:opacity-40 dark:bg-stone-100 dark:text-stone-950">
+            {{ busy() ? 'Guardando…' : 'Guardar evaluación' }}
+          </button>
+        </div>
+      </fieldset>
+      @if (formError()) {
+        <p role="alert" class="text-sm text-red-700 dark:text-red-300">{{ formError() }}</p>
+      }
+    </form></app-modal
+  >
+}
+@if (detail(); as r) {
+  <app-modal
+    title="Evaluación física registrada"
+    [busy]="busy()"
+    (dismiss)="!busy() && detail.set(null)"
+    ><p class="text-lg font-medium">{{ label(r.animal) }}</p>
+    <p class="mt-2 text-xs text-stone-500">
+      {{ r.date | date: 'dd/MM/yyyy' : 'UTC' }} · Registro descriptivo
+    </p>
+    <p class="mt-4 text-sm">Evaluada por {{ r.evaluated_by }}</p>
+    <p class="mt-2 text-xs text-stone-500">Capturada por {{ r.recorded_by }}</p>
+    <dl class="my-6 space-y-5 border-y border-stone-200 py-5 dark:border-white/10">
+      @for (f of r.findings; track f.code) {
+        <div data-physical-finding>
+          <dt class="text-sm font-medium">{{ f.label }}</dt>
+          <dd class="mt-2">
+            <p class="text-xs leading-5 text-stone-500">{{ f.description }}</p>
+            <p class="mt-3 whitespace-pre-wrap break-words text-sm leading-6">
+              {{ f.observation || 'Sin evaluar' }}
+            </p>
+          </dd>
+        </div>
+      }
+    </dl>
+    @if (r.notes) {
+      <h3 class="text-sm font-medium">Observaciones generales</h3>
+      <p class="mt-3 whitespace-pre-wrap break-words text-sm leading-6">{{ r.notes }}</p>
+    }
+    <p class="mt-5 text-xs leading-5 text-stone-500">
+      Se conserva como fue registrada. Para una revisión posterior, registra una evaluación nueva.
+    </p></app-modal
+  >
+}

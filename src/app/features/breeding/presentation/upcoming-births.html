@@ -1,0 +1,289 @@
+@if (!historyOpen()) {
+  <section class="mx-auto max-w-6xl">
+    <p class="mb-3 text-xs text-stone-500">Mi rancho / Reproducción / Partos próximos</p>
+    <div class="mb-7 flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-semibold tracking-tight">Partos próximos</h1>
+        <p class="mt-2 text-sm text-stone-500">
+          Seguimiento de hembras con diagnóstico gestante vigente.
+        </p>
+      </div>
+      @if (allowed && canWrite) {
+        <a
+          routerLink="/dashboard/breeding"
+          [queryParams]="{ kind: 'birth' }"
+          class="rounded-lg bg-green-900 px-4 py-3 text-xs text-white dark:bg-stone-100 dark:text-stone-950"
+          >Ir a registrar parto</a
+        >
+      }
+    </div>
+    <nav
+      aria-label="Reproducción"
+      class="mb-6 flex flex-wrap gap-6 border-b border-stone-200 text-sm dark:border-white/10">
+      <a routerLink="/dashboard/breeding" class="pb-3 text-stone-500">Registros reproductivos</a
+      ><span class="border-b-2 border-green-800 pb-3 dark:border-green-400" aria-current="page"
+        >Partos próximos</span
+      >
+      <a routerLink="/dashboard/breeding/performance" class="pb-3 text-stone-500">Desempeño</a>
+      <a
+        routerLink="/dashboard/breeding/assessments"
+        class="border-b-2 border-transparent py-3 text-sm text-stone-500"
+        >Evaluaciones maternas y de crías</a
+      >
+      <a
+        routerLink="/dashboard/breeding/indicators"
+        class="border-b-2 border-transparent py-3 text-sm text-stone-500"
+        >Indicadores</a
+      >
+    </nav>
+    @if (!allowed) {
+      <p class="py-12 text-sm text-stone-500">No tienes permiso para consultar Reproducción.</p>
+    } @else {
+      <form
+        [formGroup]="form"
+        (ngSubmit)="search()"
+        class="grid grid-cols-1 gap-4 border-b border-stone-200 pb-6 sm:grid-cols-2 lg:grid-cols-3 dark:border-white/10">
+        <div class="min-w-0">
+          <label for="upcoming-q" class="mb-2 block text-xs">Nombre o SINIIGA de la hembra</label
+          ><input
+            id="upcoming-q"
+            formControlName="q"
+            maxlength="100"
+            class="w-full min-w-0 rounded-lg border border-stone-300 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+        </div>
+        <div class="min-w-0">
+          <label for="upcoming-status" class="mb-2 block text-xs">Estado de la estimación</label
+          ><select
+            id="upcoming-status"
+            formControlName="status"
+            class="w-full min-w-0 rounded-lg border border-stone-300 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-stone-900">
+            <option value="all">Todas las gestantes</option>
+            <option value="past_estimate">Fecha estimada pasada</option>
+            <option value="due">Estimado para hoy</option>
+            <option value="upcoming">Próximas</option>
+            <option value="scheduled">Más adelante</option>
+            <option value="missing_mating">Sin fecha estimada</option>
+          </select>
+        </div>
+        <div class="min-w-0">
+          <label for="upcoming-notice" class="mb-2 block text-xs"
+            >Considerar próximas dentro de (días)</label
+          ><input
+            id="upcoming-notice"
+            type="number"
+            min="1"
+            max="60"
+            step="1"
+            formControlName="notice_days"
+            class="w-full min-w-0 rounded-lg border border-stone-300 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+        </div>
+        @if (form.invalid && form.touched) {
+          <p
+            role="alert"
+            class="text-xs text-red-700 sm:col-span-2 lg:col-span-3 dark:text-red-400">
+            Indica un aviso de 1 a 60 días enteros.
+          </p>
+        }
+        <div class="flex flex-wrap items-center gap-5 sm:col-span-2 lg:col-span-3">
+          <button
+            type="submit"
+            [disabled]="loading()"
+            class="rounded-lg border border-stone-300 px-4 py-2 text-xs disabled:opacity-50 dark:border-white/15">
+            Aplicar filtros</button
+          ><button
+            type="button"
+            (click)="reset()"
+            class="text-xs text-stone-500 underline underline-offset-4">
+            Restablecer</button
+          ><button
+            type="button"
+            (click)="load()"
+            [disabled]="loading()"
+            class="text-xs text-stone-500 underline underline-offset-4">
+            Actualizar listado
+          </button>
+        </div>
+      </form>
+      @if (error()) {
+        <p role="alert" class="mt-5 text-sm text-red-700 dark:text-red-400">
+          {{ error() }} <button type="button" (click)="load()" class="underline">Reintentar</button>
+        </p>
+      }
+      @if (loading()) {
+        <p role="status" class="py-12 text-sm text-stone-500">Cargando partos próximos…</p>
+      } @else if (!error()) {
+        <div class="my-6 flex flex-wrap justify-between gap-3 text-xs text-stone-500">
+          <p>
+            {{ page().total }}
+            {{ page().total === 1 ? 'gestante en los filtros' : 'gestantes en los filtros' }}
+          </p>
+          <p>Consulta al {{ page().as_of | date: 'dd/MM/yyyy' }}</p>
+        </div>
+        <div
+          data-testid="upcoming-summary"
+          class="mb-6 grid grid-cols-2 gap-x-6 gap-y-5 border-b border-stone-200 pb-6 sm:grid-cols-3 lg:grid-cols-5 dark:border-white/10">
+          @for (
+            state of ['past_estimate', 'due', 'upcoming', 'scheduled', 'missing_mating'];
+            track state
+          ) {
+            <div>
+              <h2 class="text-xs text-stone-500">{{ states[state] }}</h2>
+              <p class="mt-2 text-2xl font-semibold tabular-nums">
+                {{ page().counts[state] || 0 }}
+              </p>
+            </div>
+          }
+        </div>
+        <p class="mb-6 text-xs leading-relaxed text-stone-500">
+          Fecha estimada = monta vinculada + {{ page().gestation_days }} días. Es una referencia
+          promedio, no confirma cuándo ocurrirá el parto. “Próximo” incluye los siguientes
+          {{ page().notice_days }} días. Las gestantes sin una monta válida se muestran sin fecha.
+          Los totales incluyen todas las páginas.
+        </p>
+        <div
+          class="min-w-0 overflow-x-auto rounded-xl border border-stone-200 dark:border-white/10">
+          <table class="w-full min-w-[950px] text-left text-sm">
+            <thead class="bg-stone-50 text-xs text-stone-500 dark:bg-white/5">
+              <tr>
+                <th class="p-4 font-normal">Hembra</th>
+                <th class="p-4 font-normal">Diagnóstico gestante</th>
+                <th class="p-4 font-normal">Monta vinculada</th>
+                <th class="p-4 font-normal">Parto estimado</th>
+                <th class="p-4 font-normal">Estado</th>
+                <th class="p-4 font-normal">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of page().items; track r.id) {
+                <tr
+                  data-upcoming-row
+                  class="border-t border-stone-200 align-top dark:border-white/10">
+                  <td class="p-4">
+                    <p class="font-medium">{{ r.animal.name || r.animal.siniiga }}</p>
+                    @if (r.animal.name && r.animal.siniiga) {
+                      <p class="mt-1 text-xs text-stone-500">{{ r.animal.siniiga }}</p>
+                    }
+                  </td>
+                  <td class="whitespace-nowrap p-4">{{ r.diagnosis_date | date: 'dd/MM/yyyy' }}</td>
+                  <td class="p-4">
+                    @if (r.mating_date) {
+                      <p class="whitespace-nowrap">{{ r.mating_date | date: 'dd/MM/yyyy' }}</p>
+                      @if (r.male) {
+                        <p class="mt-1 text-xs text-stone-500">{{ label(r.male) }}</p>
+                      }
+                    } @else {
+                      <span class="text-xs text-stone-500">Sin referencia válida</span>
+                    }
+                  </td>
+                  <td class="p-4">
+                    @if (r.expected_birth_date) {
+                      <p class="whitespace-nowrap">
+                        {{ r.expected_birth_date | date: 'dd/MM/yyyy' }}
+                      </p>
+                    } @else {
+                      <p class="text-xs text-stone-500">Sin fecha estimada</p>
+                    }
+                    <p class="mt-1 text-xs text-stone-500">{{ remaining(r) }}</p>
+                  </td>
+                  <td class="max-w-64 p-4">
+                    <p class="text-xs font-medium">{{ states[r.status] }}</p>
+                    @if (r.missing_reason) {
+                      <p class="mt-2 text-xs text-stone-500">{{ reasons[r.missing_reason] }}</p>
+                    }
+                    @if (r.status === 'past_estimate') {
+                      <p class="mt-2 text-xs text-stone-500">
+                        La estimación pasó y no hay un parto posterior registrado.
+                      </p>
+                    }
+                  </td>
+                  <td class="p-4">
+                    <button
+                      type="button"
+                      (click)="showHistory(r.animal)"
+                      [attr.aria-label]="'Ver historial de ' + label(r.animal)"
+                      class="inline-flex items-center gap-2 whitespace-nowrap text-xs hover:text-green-800 dark:hover:text-green-400">
+                      <lucide-icon [img]="clock" [size]="15" />Historial
+                    </button>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="6" class="p-10 text-center text-stone-500">
+                    No hay gestantes que coincidan con los filtros.
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-5 flex flex-wrap items-center justify-between gap-4 text-xs text-stone-500">
+          <p>
+            Un parto, un diagnóstico posterior de vacía o dudosa, o una salida actualizan el
+            listado.
+          </p>
+          <div class="flex items-center gap-4">
+            <span
+              >{{ page().total ? page().offset + 1 : 0 }}–{{
+                page().offset + page().items.length
+              }}
+              de {{ page().total }}</span
+            ><button
+              type="button"
+              (click)="load(page().offset - page().limit)"
+              [disabled]="page().offset === 0"
+              class="disabled:opacity-40">
+              Anterior</button
+            ><button
+              type="button"
+              (click)="load(page().offset + page().limit)"
+              [disabled]="page().offset + page().limit >= page().total"
+              class="disabled:opacity-40">
+              Siguiente
+            </button>
+          </div>
+        </div>
+      }
+    }
+  </section>
+}
+@if (historyOpen()) {
+  <app-detail-page title="Historial reproductivo" (dismiss)="closeHistory()">
+    @if (historyLoading()) {
+      <p role="status" class="py-8 text-sm text-stone-500">Cargando historial…</p>
+    }
+    @if (historyError()) {
+      <p role="alert" class="text-sm text-red-700 dark:text-red-400">{{ historyError() }}</p>
+    }
+    @if (history(); as h) {
+      <h3 class="mb-6 text-lg font-medium">{{ label(h.animal) }}</h3>
+      <ol class="space-y-6 border-l border-stone-200 pl-4 dark:border-white/10">
+        @for (e of h.items; track e.id) {
+          <li>
+            <p class="text-sm font-medium">{{ kindLabel(e.kind) }}</p>
+            <p class="mt-1 text-xs text-stone-500">
+              {{ e.date | date: 'dd/MM/yyyy' }} · {{ e.recorded_by }}
+            </p>
+            @if (e.result) {
+              <p class="mt-2 text-sm">{{ resultLabel(e.result) }}</p>
+            }
+            @if (e.male) {
+              <p class="mt-2 text-xs">Macho: {{ label(e.male) }}</p>
+            }
+            @if (e.birth_type) {
+              <p class="mt-2 text-xs">
+                {{ resultLabel(e.birth_type) }} · {{ e.offspring.length }} crías
+              </p>
+            }
+            @if (e.notes) {
+              <p class="mt-2 break-words whitespace-pre-wrap text-xs text-stone-500">
+                {{ e.notes }}
+              </p>
+            }
+          </li>
+        } @empty {
+          <li class="text-sm text-stone-500">Sin registros reproductivos.</li>
+        }
+      </ol>
+    }
+  </app-detail-page>
+}

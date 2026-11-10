@@ -1,0 +1,301 @@
+<section class="mx-auto max-w-6xl">
+  <p class="mb-3 text-xs text-stone-500">Mi rancho / Ubicaciones / Animales y traslados</p>
+  <h1 class="text-2xl font-semibold tracking-tight">Ubicación y traslados</h1>
+  <p class="mb-7 mt-2 text-sm text-stone-500">
+    Corrales, potreros e historial de ubicación de cada animal.
+  </p>
+  <app-organization-nav />
+  @if (!allowed) {
+    <p class="py-12 text-sm text-stone-500">No tienes permiso para consultar ubicaciones.</p>
+  } @else {
+    <form
+      [formGroup]="filters"
+      (ngSubmit)="search()"
+      class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="min-w-0">
+        <label for="movement-q" class="mb-2 block text-xs">Animal o SINIIGA</label
+        ><input
+          id="movement-q"
+          formControlName="q"
+          maxlength="100"
+          class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+      </div>
+      <div class="min-w-0">
+        <label for="movement-status" class="mb-2 block text-xs">Estado</label
+        ><select
+          id="movement-status"
+          formControlName="status"
+          class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-stone-900">
+          <option value="active">En el hato</option>
+          <option value="exited">Con salida</option>
+          <option value="all">Todos</option>
+        </select>
+      </div>
+      <div class="min-w-0">
+        <label for="movement-filter-location" class="mb-2 block text-xs"
+          >Ubicación / última conocida</label
+        ><select
+          id="movement-filter-location"
+          formControlName="location_id"
+          class="w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-stone-900">
+          <option value="">Todas</option>
+          @for (l of locations(); track l.id) {
+            <option [value]="l.id">{{ l.name }}{{ l.active ? '' : ' · Inactiva' }}</option>
+          }
+        </select>
+      </div>
+      <div class="flex items-end">
+        <button
+          type="submit"
+          [disabled]="loading()"
+          class="rounded-lg border border-stone-200 px-4 py-3 text-xs disabled:opacity-40 dark:border-white/15">
+          Aplicar filtros
+        </button>
+      </div>
+    </form>
+    @if (catalogError()) {
+      <p role="alert" class="mb-5 text-sm text-red-700 dark:text-red-400">
+        {{ catalogError() }}
+        <button type="button" (click)="loadCatalog()" class="underline">Reintentar</button>
+      </p>
+    }
+    @if (success()) {
+      <p role="status" class="mb-5 text-sm text-green-800 dark:text-green-300">{{ success() }}</p>
+    }
+    @if (error()) {
+      <p role="alert" class="mb-5 text-sm text-red-700 dark:text-red-400">
+        {{ error() }} <button type="button" (click)="load()" class="underline">Reintentar</button>
+      </p>
+    }
+    @if (loading()) {
+      <p role="status" class="py-12 text-sm text-stone-500">Cargando ubicaciones…</p>
+    } @else if (!error()) {
+      <div class="mb-5 flex flex-wrap justify-between gap-3 text-xs text-stone-500">
+        <p>{{ page().total }} {{ page().total === 1 ? 'animal' : 'animales' }} en los filtros</p>
+        <p>Consulta al {{ page().as_of | date: 'dd/MM/yyyy' }}</p>
+      </div>
+      <p class="mb-6 text-xs leading-relaxed text-stone-500">
+        La ubicación física y el lote son independientes. Un traslado conserva el historial. Los
+        animales con salida muestran su última ubicación conocida y no pueden trasladarse.
+      </p>
+      <div class="min-w-0 overflow-x-auto rounded-xl border border-stone-200 dark:border-white/10">
+        <table class="w-full min-w-[850px] text-left text-sm">
+          <thead class="bg-stone-50 text-xs text-stone-500 dark:bg-white/5">
+            <tr>
+              <th class="p-4 font-normal">Animal</th>
+              <th class="p-4 font-normal">Estado</th>
+              <th class="p-4 font-normal">Ubicación</th>
+              <th class="p-4 font-normal">Desde</th>
+              <th class="sticky right-0 bg-stone-50 p-4 font-normal dark:bg-stone-900">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (p of page().items; track p.animal.id) {
+              <tr data-position-row class="border-t border-stone-200 dark:border-white/10">
+                <td class="p-4">
+                  <p class="font-medium">{{ p.animal.name || p.animal.siniiga }}</p>
+                  @if (p.animal.name && p.animal.siniiga) {
+                    <p class="mt-1 text-xs text-stone-500">{{ p.animal.siniiga }}</p>
+                  }
+                </td>
+                <td class="p-4">{{ p.exited ? 'Fuera del hato' : 'En el hato' }}</td>
+                <td class="p-4">
+                  <p>{{ p.last_known_location?.name || 'Sin ubicación registrada' }}</p>
+                  @if (p.exited && p.last_known_location) {
+                    <p class="mt-1 text-xs text-stone-500">Última conocida</p>
+                  }
+                </td>
+                <td class="whitespace-nowrap p-4">
+                  {{
+                    p.last_known_location ? (p.last_known_location.since | date: 'dd/MM/yyyy') : '—'
+                  }}
+                </td>
+                <td class="sticky right-0 bg-white p-4 dark:bg-[#101010]">
+                  <div class="flex flex-wrap gap-4">
+                    <button
+                      type="button"
+                      (click)="openHistory(p.animal)"
+                      [attr.aria-label]="'Historial de ubicación de ' + label(p.animal)"
+                      class="text-xs hover:underline">
+                      Historial
+                    </button>
+                    @if (canWrite && !p.exited) {
+                      <button
+                        type="button"
+                        (click)="open(p)"
+                        [attr.aria-label]="'Cambiar ubicación de ' + label(p.animal)"
+                        class="text-xs text-green-800 hover:underline dark:text-green-300">
+                        {{ p.current_location ? 'Trasladar' : 'Asignar ubicación' }}
+                      </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="5" class="p-10 text-center text-stone-500">
+                  No hay animales con estos filtros.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <div class="mt-5 flex flex-wrap justify-end gap-5 text-xs text-stone-500">
+        <span
+          >{{ page().total ? page().offset + 1 : 0 }}–{{ page().offset + page().items.length }} de
+          {{ page().total }}</span
+        ><button
+          type="button"
+          (click)="load(page().offset - page().limit)"
+          [disabled]="page().offset === 0"
+          class="disabled:opacity-40">
+          Anterior</button
+        ><button
+          type="button"
+          (click)="load(page().offset + page().limit)"
+          [disabled]="page().offset + page().limit >= page().total"
+          class="disabled:opacity-40">
+          Siguiente
+        </button>
+      </div>
+    }
+  }
+</section>
+@if (selected(); as p) {
+  <app-modal
+    [title]="p.current_location ? 'Registrar traslado' : 'Asignar ubicación'"
+    [busy]="busy()"
+    (dismiss)="close()"
+    ><h3 class="text-lg font-medium">{{ label(p.animal) }}</h3>
+    <p class="mt-2 text-sm text-stone-500">
+      Actual: {{ p.current_location?.name || 'Sin ubicación registrada' }}
+    </p>
+    <form [formGroup]="form" (ngSubmit)="save()" class="mt-6">
+      <fieldset [disabled]="busy()" class="min-w-0 space-y-5">
+        <div class="min-w-0">
+          <label for="movement-target" class="mb-2 block text-xs">Ubicación de destino *</label
+          ><select
+            id="movement-target"
+            formControlName="location_id"
+            class="w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-stone-900">
+            <option value="">Selecciona una ubicación</option>
+            @for (l of locations(); track l.id) {
+              @if (l.active && l.id !== p.current_location?.id) {
+                <option [value]="l.id">{{ l.name }}</option>
+              }
+            }
+          </select>
+        </div>
+        <div class="min-w-0">
+          <label for="movement-date" class="mb-2 block text-xs">Fecha *</label
+          ><input
+            id="movement-date"
+            type="date"
+            formControlName="date"
+            [max]="today"
+            class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+        </div>
+        <div>
+          <label for="movement-reason" class="mb-2 block text-xs">Motivo *</label
+          ><textarea
+            id="movement-reason"
+            formControlName="reason"
+            rows="3"
+            maxlength="2000"
+            placeholder="Por qué se cambia de ubicación"
+            class="w-full rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15"></textarea>
+        </div>
+        <p class="text-xs leading-relaxed text-stone-500">
+          La fecha debe ser posterior al último registro de ubicación. Se admite un registro por
+          animal y día. El lote del animal conserva su propia asignación.
+        </p>
+        @if (catalogLoading()) {
+          <p class="text-xs text-stone-500">Cargando destinos…</p>
+        }
+        @if (catalogError()) {
+          <p role="alert" class="text-xs text-red-700 dark:text-red-400">
+            {{ catalogError() }}
+            <button type="button" (click)="loadCatalog()" class="underline">Reintentar</button>
+          </p>
+        }
+        @if (form.invalid && form.touched) {
+          <p class="text-xs text-red-700 dark:text-red-400">Completa destino, fecha y motivo.</p>
+        }
+        @if (formError()) {
+          <p role="alert" class="text-sm text-red-700 dark:text-red-400">{{ formError() }}</p>
+        }
+        <div class="flex justify-end gap-4 border-t border-stone-200 pt-5 dark:border-white/10">
+          <button type="button" (click)="close()" class="text-xs">Cancelar</button
+          ><button
+            type="submit"
+            [disabled]="catalogLoading() || !!catalogError()"
+            class="rounded-lg bg-green-900 px-4 py-3 text-xs text-white disabled:opacity-40 dark:bg-stone-100 dark:text-stone-950">
+            {{ busy() ? 'Guardando…' : 'Guardar traslado' }}
+          </button>
+        </div>
+      </fieldset>
+    </form></app-modal
+  >
+}
+@if (historyAnimal(); as a) {
+  <app-modal title="Historial de ubicaciones" (dismiss)="closeHistory()"
+    ><h3 class="mb-5 text-lg font-medium">{{ label(a) }}</h3>
+    @if (historyLoading()) {
+      <p role="status" class="py-8 text-sm text-stone-500">Cargando historial…</p>
+    }
+    @if (historyError()) {
+      <p role="alert" class="text-sm text-red-700 dark:text-red-400">
+        {{ historyError() }}
+        <button type="button" (click)="loadHistory()" class="underline">Reintentar</button>
+      </p>
+    }
+    @if (history(); as h) {
+      <p class="mb-6 text-xs text-stone-500">
+        {{ h.exited ? 'Fuera del hato · Última conocida: ' : 'Ubicación actual: '
+        }}{{ h.last_known_location?.name || 'Sin registrar' }}
+      </p>
+      <ol class="space-y-6 border-l border-stone-200 pl-4 dark:border-white/10">
+        @for (m of h.items; track m.id) {
+          <li data-movement-history>
+            <h4 class="text-sm font-medium">
+              {{ m.from_location?.name || 'Sin ubicación previa registrada' }} →
+              {{ m.to_location.name }}
+            </h4>
+            <p class="mt-2 text-xs text-stone-500">
+              {{ m.date | date: 'dd/MM/yyyy' }} · {{ m.recorded_by }}
+            </p>
+            <p class="mt-2 break-words whitespace-pre-wrap text-sm">
+              {{ m.reason || 'Sin motivo registrado' }}
+            </p>
+            @if (m.event_type_id !== 9) {
+              <p class="mt-2 text-xs text-stone-500">
+                Ubicación registrada en otro evento del historial.
+              </p>
+            }
+          </li>
+        } @empty {
+          <li class="text-sm text-stone-500">Sin registros de ubicación.</li>
+        }
+      </ol>
+      @if (h.total > h.limit) {
+        <div class="mt-6 flex flex-wrap justify-end gap-4 text-xs text-stone-500">
+          <span>{{ h.offset + 1 }}–{{ h.offset + h.items.length }} de {{ h.total }}</span
+          ><button
+            type="button"
+            (click)="loadHistory(h.offset - h.limit)"
+            [disabled]="h.offset === 0"
+            class="disabled:opacity-40">
+            Anterior</button
+          ><button
+            type="button"
+            (click)="loadHistory(h.offset + h.limit)"
+            [disabled]="h.offset + h.limit >= h.total"
+            class="disabled:opacity-40">
+            Siguiente
+          </button>
+        </div>
+      }
+    }
+  </app-modal>
+}

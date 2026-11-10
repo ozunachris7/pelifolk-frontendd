@@ -1,0 +1,519 @@
+@if (!detailOpen()) {
+  @if (!canRead()) {
+    <p class="p-8 text-sm text-stone-500">No tienes permiso para consultar sanidad.</p>
+  } @else {
+    <header class="mb-6 flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <p class="text-xs uppercase tracking-widest text-stone-500">Sanidad</p>
+        <h1 class="mt-2 text-2xl font-medium tracking-tight">Incidentes</h1>
+        <p class="mt-3 max-w-2xl text-sm leading-6 text-stone-500">
+          Accidentes y hechos extraordinarios del animal, con el reporte original y su seguimiento.
+        </p>
+      </div>
+      @if (canWrite()) {
+        <button
+          type="button"
+          (click)="start()"
+          data-new-incident
+          class="rounded-lg bg-green-900 px-4 py-3 text-sm font-medium text-white dark:bg-stone-100 dark:text-stone-950 inline-flex items-center gap-2">
+          <lucide-icon [img]="plus" [size]="16" />Registrar incidente
+        </button>
+      }
+    </header>
+    <app-health-nav />
+    <form (submit)="$event.preventDefault(); load()" class="mb-6 flex flex-wrap items-end gap-3">
+      <div class="min-w-0 flex-1">
+        <label for="incident-search" class="mb-2 block text-xs">Buscar animal</label
+        ><input
+          id="incident-search"
+          [value]="search()"
+          (input)="search.set($any($event.target).value)"
+          maxlength="100"
+          class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+      </div>
+      <div>
+        <label for="incident-filter-kind" class="mb-2 block text-xs">Tipo</label
+        ><select
+          id="incident-filter-kind"
+          [value]="filterKind()"
+          (change)="filterKind.set($any($event.target).value)"
+          class="w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+          <option value="">Todos</option>
+          @for (k of kinds; track k.value) {
+            <option [value]="k.value">{{ k.label }}</option>
+          }
+        </select>
+      </div>
+      <div>
+        <label for="incident-status" class="mb-2 block text-xs">Estado</label
+        ><select
+          id="incident-status"
+          [value]="status()"
+          (change)="status.set($any($event.target).value)"
+          class="w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+          <option value="">Todos</option>
+          @for (s of statuses; track s.value) {
+            <option [value]="s.value">{{ s.label }}</option>
+          }
+        </select>
+      </div>
+      <button
+        type="submit"
+        class="rounded-lg bg-green-900 px-4 py-3 text-sm font-medium text-white dark:bg-stone-100 dark:text-stone-950">
+        Buscar
+      </button>
+      @if (animalFilter()) {
+        <button type="button" (click)="animalFilter.set(''); load()" class="py-3 text-xs underline">
+          Quitar filtro de animal
+        </button>
+      }
+    </form>
+    @if (success()) {
+      <p role="status" class="mb-4 text-sm">{{ success() }}</p>
+    }
+    @if (error()) {
+      <p role="alert" class="mb-4 text-sm text-red-700 dark:text-red-300">
+        {{ error() }} <button type="button" (click)="load()" class="underline">Reintentar</button>
+      </p>
+    }
+    @if (loading()) {
+      <p role="status" class="py-10 text-sm text-stone-500">Cargando incidentes…</p>
+    } @else {
+      <div class="relative overflow-x-auto rounded-xl border border-stone-200 dark:border-white/10">
+        <table class="w-full text-left text-sm">
+          <thead class="border-b border-stone-200 text-xs text-stone-500 dark:border-white/10">
+            <tr>
+              <th class="p-4">Animal</th>
+              <th class="p-4">Fecha y tipo</th>
+              <th class="p-4">Descripción</th>
+              <th class="p-4">Estado</th>
+              <th class="p-4"><span class="sr-only">Acciones</span></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-stone-200 dark:divide-white/10">
+            @for (r of page().items; track r.id) {
+              <tr data-incident-row>
+                <td class="whitespace-nowrap p-4 font-medium">{{ label(r.animal) }}</td>
+                <td class="whitespace-nowrap p-4">
+                  <p class="text-xs text-stone-500">{{ r.date | date: 'dd/MM/yyyy' : 'UTC' }}</p>
+                  <p class="mt-2">{{ kind(r.kind) }}</p>
+                </td>
+                <td class="p-4">
+                  <p class="line-clamp-2 max-w-sm break-words text-xs leading-5">
+                    {{ r.description }}
+                  </p>
+                  @if (r.location) {
+                    <p class="mt-2 text-xs text-stone-500">{{ r.location }}</p>
+                  }
+                </td>
+                <td class="whitespace-nowrap p-4 text-xs">{{ statusLabel(r.status) }}</td>
+                <td class="p-4">
+                  <button
+                    type="button"
+                    (click)="view(r.id)"
+                    class="rounded-lg border border-stone-200 px-4 py-3 text-sm dark:border-white/15 inline-flex items-center gap-2 whitespace-nowrap text-xs">
+                    <lucide-icon [img]="eye" [size]="15" />Ver incidente
+                  </button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="5" class="p-8 text-center text-stone-500">
+                  No hay incidentes para estos filtros.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (page().total > page().limit) {
+        <div class="mt-5 flex flex-wrap justify-end gap-4 text-xs">
+          <span
+            >{{ page().offset + 1 }}–{{ page().offset + page().items.length }} de
+            {{ page().total }}</span
+          ><button
+            type="button"
+            (click)="load(page().offset - page().limit)"
+            [disabled]="page().offset === 0"
+            class="disabled:opacity-40">
+            Anterior</button
+          ><button
+            type="button"
+            (click)="load(page().offset + page().limit)"
+            [disabled]="page().offset + page().limit >= page().total"
+            class="disabled:opacity-40">
+            Siguiente
+          </button>
+        </div>
+      }
+    }
+    <p class="mt-5 text-xs leading-5 text-stone-500">
+      Reportar un incidente no registra una salida del hato ni modifica montas, gestaciones o
+      partos. Esos movimientos se capturan en sus secciones.
+    </p>
+  }
+}
+@if (formOpen()) {
+  <app-modal title="Registrar incidente" [busy]="busy()" (dismiss)="dismiss()"
+    ><form [formGroup]="form" (ngSubmit)="save()" class="space-y-5">
+      <fieldset [disabled]="busy()" class="min-w-0 space-y-5">
+        <div>
+          <label for="incident-animal-search" class="mb-2 block text-xs"
+            >Buscar animal por nombre o SINIIGA</label
+          >
+          <div class="flex gap-2">
+            <input
+              id="incident-animal-search"
+              [value]="animalSearch()"
+              (input)="animalSearch.set($any($event.target).value)"
+              maxlength="100"
+              class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" /><button
+              type="button"
+              (click)="findAnimals()"
+              [disabled]="animalLoading()"
+              class="rounded-lg border border-stone-200 px-4 py-3 text-sm dark:border-white/15">
+              Buscar
+            </button>
+          </div>
+        </div>
+        <div>
+          <label for="incident-animal" class="mb-2 block text-xs">Animal *</label
+          ><select
+            id="incident-animal"
+            formControlName="animal_id"
+            (change)="animalChanged()"
+            class="w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+            <option value="">Selecciona el animal</option>
+            @for (a of animals(); track a.id) {
+              <option [value]="a.id">{{ label(a) }}</option>
+            }
+          </select>
+          @if (animalLoading()) {
+            <p role="status" class="mt-2 text-xs text-stone-500">Cargando animales…</p>
+          }
+        </div>
+        <div class="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label for="incident-date" class="mb-2 block text-xs">Fecha del incidente *</label
+            ><input
+              id="incident-date"
+              type="date"
+              formControlName="date"
+              [max]="today"
+              class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+          </div>
+          <div>
+            <label for="incident-kind" class="mb-2 block text-xs">Tipo de incidente *</label
+            ><select
+              id="incident-kind"
+              formControlName="kind"
+              class="w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+              @for (k of kinds; track k.value) {
+                <option [value]="k.value">{{ k.label }}</option>
+              }
+            </select>
+          </div>
+        </div>
+        <div>
+          <label for="incident-description" class="mb-2 block text-xs">¿Qué ocurrió? *</label
+          ><textarea
+            id="incident-description"
+            formControlName="description"
+            rows="4"
+            maxlength="5000"
+            class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15"></textarea>
+        </div>
+        <div>
+          <label for="incident-location" class="mb-2 block text-xs"
+            >Lugar reportado (opcional)</label
+          ><input
+            id="incident-location"
+            formControlName="location"
+            maxlength="190"
+            class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+        </div>
+        <div>
+          <label for="incident-actions" class="mb-2 block text-xs"
+            >Acciones iniciales (opcional)</label
+          ><textarea
+            id="incident-actions"
+            formControlName="initial_actions"
+            rows="3"
+            maxlength="5000"
+            class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15"></textarea>
+        </div>
+        @if (form.controls.animal_id.value) {
+          <div class="border-t border-stone-200 pt-4 dark:border-white/10">
+            <label for="incident-case-search" class="mb-2 block text-xs"
+              >Buscar un caso del animal (opcional)</label
+            >
+            <div class="flex gap-2">
+              <input
+                id="incident-case-search"
+                [value]="caseSearch()"
+                (input)="caseSearch.set($any($event.target).value)"
+                maxlength="100"
+                class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" /><button
+                type="button"
+                (click)="findCases()"
+                [disabled]="caseLoading()"
+                class="rounded-lg border border-stone-200 px-4 py-3 text-sm dark:border-white/15">
+                Buscar
+              </button>
+            </div>
+          </div>
+          <div>
+            <label for="incident-case" class="mb-2 block text-xs">Caso sanitario relacionado</label
+            ><select
+              id="incident-case"
+              formControlName="health_case_id"
+              class="w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+              <option value="">Sin caso vinculado</option>
+              @for (c of cases(); track c.id) {
+                <option [value]="c.id">
+                  {{ c.start_date | date: 'dd/MM/yyyy' : 'UTC' }} · {{ c.reason }}
+                </option>
+              }
+            </select>
+            @if (caseLoading()) {
+              <p role="status" class="mt-2 text-xs text-stone-500">Cargando casos…</p>
+            }
+            <p class="mt-2 text-xs leading-5 text-stone-500">
+              Puedes dejarlo vacío y vincular un caso en un seguimiento posterior. Los casos se
+              gestionan en Casos y observaciones.
+            </p>
+          </div>
+          @if (optionsError()) {
+            <p role="alert" class="text-xs text-red-700 dark:text-red-300">{{ optionsError() }}</p>
+          }
+        }
+        <p class="text-xs leading-5 text-stone-500">
+          El reporte quedará abierto. Registra solamente lo observado; los diagnósticos y
+          tratamientos se capturan en el caso sanitario.
+        </p>
+        <div class="flex justify-end gap-3">
+          <button
+            type="button"
+            (click)="dismiss()"
+            class="rounded-lg border border-stone-200 px-4 py-3 text-sm dark:border-white/15">
+            Cancelar</button
+          ><button
+            type="submit"
+            class="rounded-lg bg-green-900 px-4 py-3 text-sm font-medium text-white dark:bg-stone-100 dark:text-stone-950">
+            {{ busy() ? 'Guardando…' : 'Guardar incidente' }}
+          </button>
+        </div>
+      </fieldset>
+      @if (formError()) {
+        <p role="alert" class="text-sm text-red-700 dark:text-red-300">{{ formError() }}</p>
+      }
+    </form></app-modal
+  >
+}
+@if (detailOpen()) {
+  <app-detail-page title="Detalle del incidente" [busy]="busy()" (dismiss)="closeDetail()">
+    @if (detailLoading()) {
+      <p role="status" class="py-6 text-sm text-stone-500">Cargando incidente…</p>
+    }
+    @if (detailError()) {
+      <p role="alert" class="text-sm text-red-700 dark:text-red-300">{{ detailError() }}</p>
+    }
+    @if (detail(); as d) {
+      <p class="text-lg font-medium">{{ label(d.incident.animal) }}</p>
+      <p class="mt-3 text-sm">{{ kind(d.incident.kind) }} · {{ statusLabel(d.incident.status) }}</p>
+      <p class="mt-2 text-xs text-stone-500">
+        {{ d.incident.date | date: 'dd/MM/yyyy' : 'UTC' }} · {{ d.incident.recorded_by }}
+      </p>
+      <section class="my-6 border-y border-stone-200 py-5 dark:border-white/10">
+        <h3 class="text-sm font-medium">Reporte original</h3>
+        <p class="mt-3 whitespace-pre-wrap break-words text-sm leading-6">
+          {{ d.incident.description }}
+        </p>
+        @if (d.incident.location) {
+          <p class="mt-3 text-xs text-stone-500">Lugar: {{ d.incident.location }}</p>
+        }
+        @if (d.incident.initial_actions) {
+          <h4 class="mt-4 text-xs font-medium">Acciones iniciales</h4>
+          <p class="mt-2 whitespace-pre-wrap break-words text-sm">
+            {{ d.incident.initial_actions }}
+          </p>
+        }
+        @if (d.incident.health_case; as c) {
+          <a
+            routerLink="/dashboard/health"
+            [queryParams]="{ case_id: c.id }"
+            class="mt-4 block text-xs underline underline-offset-4"
+            >Ver caso: {{ c.reason }}</a
+          >
+        }
+      </section>
+      @if (canWrite() && !followOpen()) {
+        <button
+          type="button"
+          (click)="startFollowup()"
+          data-new-followup
+          class="rounded-lg bg-green-900 px-4 py-3 text-sm font-medium text-white dark:bg-stone-100 dark:text-stone-950 inline-flex items-center gap-2">
+          <lucide-icon [img]="plus" [size]="15" />{{
+            d.incident.status === 'closed' ? 'Reabrir / añadir seguimiento' : 'Añadir seguimiento'
+          }}
+        </button>
+      }
+      @if (followOpen()) {
+        <form [formGroup]="followForm" (ngSubmit)="saveFollowup()" class="my-6 space-y-5">
+          <fieldset [disabled]="busy()" class="min-w-0 space-y-5">
+            <div class="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label for="incident-follow-date" class="mb-2 block text-xs"
+                  >Fecha del seguimiento *</label
+                ><input
+                  id="incident-follow-date"
+                  type="date"
+                  formControlName="date"
+                  [min]="d.last_followup_date || d.incident.date"
+                  [max]="today"
+                  class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+              </div>
+              <div>
+                <label for="incident-follow-status" class="mb-2 block text-xs"
+                  >Estado al registrar *</label
+                ><select
+                  id="incident-follow-status"
+                  formControlName="status"
+                  class="w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+                  @for (s of statuses; track s.value) {
+                    <option [value]="s.value">{{ s.label }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+            <div>
+              <label for="incident-follow-notes" class="mb-2 block text-xs"
+                >Nota, resultado o motivo de reapertura *</label
+              ><textarea
+                id="incident-follow-notes"
+                formControlName="notes"
+                rows="4"
+                maxlength="5000"
+                class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15"></textarea>
+            </div>
+            <div class="border-t border-stone-200 pt-4 dark:border-white/10">
+              <label for="incident-follow-case-search" class="mb-2 block text-xs"
+                >Buscar un caso del animal (opcional)</label
+              >
+              <div class="flex gap-2">
+                <input
+                  id="incident-follow-case-search"
+                  [value]="caseSearch()"
+                  (input)="caseSearch.set($any($event.target).value)"
+                  maxlength="100"
+                  class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" /><button
+                  type="button"
+                  (click)="findCases()"
+                  [disabled]="caseLoading()"
+                  class="rounded-lg border border-stone-200 px-4 py-3 text-sm dark:border-white/15">
+                  Buscar
+                </button>
+              </div>
+            </div>
+            <div>
+              <label for="incident-follow-case" class="mb-2 block text-xs"
+                >Caso sanitario relacionado</label
+              ><select
+                id="incident-follow-case"
+                formControlName="health_case_id"
+                class="w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+                <option value="">Sin caso vinculado</option>
+                @for (c of cases(); track c.id) {
+                  <option [value]="c.id">
+                    {{ c.start_date | date: 'dd/MM/yyyy' : 'UTC' }} · {{ c.reason }}
+                  </option>
+                }
+              </select>
+              @if (caseLoading()) {
+                <p role="status" class="mt-2 text-xs text-stone-500">Cargando casos…</p>
+              }
+              <p class="mt-2 text-xs leading-5 text-stone-500">
+                Puedes dejarlo vacío y vincular un caso en un seguimiento posterior. Los casos se
+                gestionan en Casos y observaciones.
+              </p>
+            </div>
+            @if (optionsError()) {
+              <p role="alert" class="text-xs text-red-700 dark:text-red-300">
+                {{ optionsError() }}
+              </p>
+            }
+            <p class="text-xs leading-5 text-stone-500">
+              Cerrar o reabrir requiere una nota. Cada seguimiento se guarda por separado y conserva
+              los anteriores.
+            </p>
+            <div class="flex justify-end gap-3">
+              <button
+                type="button"
+                (click)="followOpen.set(false)"
+                class="rounded-lg border border-stone-200 px-4 py-3 text-sm dark:border-white/15">
+                Cancelar</button
+              ><button
+                type="submit"
+                class="rounded-lg bg-green-900 px-4 py-3 text-sm font-medium text-white dark:bg-stone-100 dark:text-stone-950">
+                {{ busy() ? 'Guardando…' : 'Guardar seguimiento' }}
+              </button>
+            </div>
+          </fieldset>
+          @if (formError()) {
+            <p role="alert" class="text-sm text-red-700 dark:text-red-300">{{ formError() }}</p>
+          }
+        </form>
+      }
+      <h3 class="mb-4 mt-7 text-sm font-medium">
+        Seguimientos registrados · {{ d.followups.total }}
+      </h3>
+      <ol class="space-y-5 border-l border-stone-200 pl-4 dark:border-white/15">
+        @for (f of d.followups.items; track f.id) {
+          <li data-incident-followup>
+            <p class="text-xs text-stone-500">
+              {{ f.date | date: 'dd/MM/yyyy' : 'UTC' }} · {{ f.recorded_by }}
+            </p>
+            <p class="mt-2 text-xs font-medium">
+              {{ statusLabel(f.status) }} · Registro {{ f.version }}
+            </p>
+            <p class="mt-2 whitespace-pre-wrap break-words text-sm leading-6">{{ f.notes }}</p>
+            @if (f.health_case; as c) {
+              <a
+                routerLink="/dashboard/health"
+                [queryParams]="{ case_id: c.id }"
+                class="mt-3 block text-xs underline underline-offset-4"
+                >Ver caso: {{ c.reason }}</a
+              >
+            }
+          </li>
+        } @empty {
+          <li class="text-xs text-stone-500">Sin notas de seguimiento todavía.</li>
+        }
+      </ol>
+      @if (d.followups.total > d.followups.limit) {
+        <div class="mt-5 flex flex-wrap justify-end gap-4 text-xs">
+          <span
+            >{{ d.followups.offset + 1 }}–{{ d.followups.offset + d.followups.items.length }} de
+            {{ d.followups.total }}</span
+          ><button
+            type="button"
+            (click)="view(d.incident.id, d.followups.offset - d.followups.limit)"
+            [disabled]="busy() || detailLoading() || d.followups.offset === 0"
+            class="disabled:opacity-40">
+            Anterior</button
+          ><button
+            type="button"
+            (click)="view(d.incident.id, d.followups.offset + d.followups.limit)"
+            [disabled]="
+              busy() ||
+              detailLoading() ||
+              d.followups.offset + d.followups.limit >= d.followups.total
+            "
+            class="disabled:opacity-40">
+            Siguiente
+          </button>
+        </div>
+      }
+    }
+  </app-detail-page>
+}

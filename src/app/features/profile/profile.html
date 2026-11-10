@@ -1,0 +1,207 @@
+<div class="mx-auto max-w-4xl">
+  <header class="mb-8 border-b border-stone-200 pb-6 dark:border-white/10">
+    <p class="mb-3 text-xs text-stone-500">Mi cuenta</p>
+    <h1 class="text-2xl font-medium tracking-tight sm:text-3xl">Mi perfil</h1>
+    <p class="mt-3 text-sm text-stone-500">Tus datos y tu foto de perfil.</p>
+  </header>
+  @if (session.user(); as user) {
+    <div class="grid min-w-0 gap-10 md:grid-cols-[220px_minmax(0,1fr)] md:gap-14">
+      <section aria-labelledby="photo-title" class="min-w-0">
+        <h2 id="photo-title" class="mb-4 text-sm font-medium">Foto de perfil</h2>
+        <div
+          class="relative mb-5 flex size-44 items-center justify-center overflow-hidden rounded-3xl border border-stone-200 bg-stone-50 dark:border-white/10 dark:bg-white/5">
+          @if (preview() || session.photoUrl(); as url) {
+            @if (url !== failedPhoto()) {
+              <img
+                [src]="url"
+                alt="Foto de perfil"
+                width="176"
+                height="176"
+                class="size-full object-cover"
+                (error)="failedPhoto.set(url)" />
+            } @else {
+              <lucide-icon [img]="userIcon" [size]="58" class="text-stone-400" aria-hidden="true" />
+            }
+          } @else {
+            <lucide-icon [img]="userIcon" [size]="58" class="text-stone-400" aria-hidden="true" />
+          }
+        </div>
+        <input
+          #photoInput
+          id="profile-photo"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          class="sr-only"
+          [disabled]="locked()"
+          (change)="choose($event)"
+          aria-label="Seleccionar foto de perfil"
+          aria-describedby="photo-help" />
+        <button
+          type="button"
+          (click)="photoInput.click()"
+          [disabled]="locked()"
+          class="inline-flex items-center gap-2 rounded-lg border border-stone-300 px-4 py-2.5 text-xs font-medium hover:bg-stone-50 disabled:opacity-50 dark:border-white/20 dark:hover:bg-white/5">
+          <lucide-icon [img]="camera" [size]="16" aria-hidden="true" />{{
+            session.photoUrl() ? 'Cambiar foto' : 'Agregar foto'
+          }}
+        </button>
+        <p id="photo-help" class="mt-3 text-xs leading-5 text-stone-500">
+          JPEG, PNG o WebP. Máximo 5 MB y 25 megapíxeles.
+        </p>
+        @if (selected(); as file) {
+          <p class="mt-4 break-all text-xs text-stone-600 dark:text-stone-300">{{ file.name }}</p>
+          <p class="mt-2 text-xs leading-5 text-stone-500">
+            Al guardar se reemplazará tu foto anterior.
+          </p>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              (click)="save()"
+              [disabled]="locked()"
+              class="inline-flex items-center gap-2 rounded-lg bg-green-900 px-4 py-2.5 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+              <lucide-icon [img]="upload" [size]="15" aria-hidden="true" />{{
+                busy() ? 'Guardando…' : 'Guardar foto'
+              }}
+            </button>
+            <button
+              type="button"
+              (click)="reset()"
+              [disabled]="locked()"
+              class="rounded-lg border border-stone-300 px-3 py-2.5 text-xs disabled:opacity-50 dark:border-white/20">
+              Cancelar
+            </button>
+          </div>
+        }
+        @if (error()) {
+          <p role="alert" class="mt-4 break-words text-sm text-red-600 dark:text-red-300">
+            {{ error() }}
+          </p>
+        }
+        @if (success()) {
+          <p role="status" class="mt-4 text-sm text-green-900 dark:text-green-200">
+            {{ success() }}
+          </p>
+        }
+      </section>
+      <section aria-labelledby="identity-title" class="min-w-0">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <p class="text-xs text-stone-500">Información de tu cuenta</p>
+          @if (!editing()) {
+            <button
+              type="button"
+              (click)="editDetails()"
+              [disabled]="locked()"
+              class="inline-flex items-center gap-2 rounded-lg border border-stone-300 px-3 py-2 text-xs font-medium hover:bg-stone-50 disabled:opacity-50 dark:border-white/20 dark:hover:bg-white/5">
+              <lucide-icon [img]="editIcon" [size]="15" aria-hidden="true" />Editar datos
+            </button>
+          }
+        </div>
+        <h2 id="identity-title" class="break-words text-xl font-medium leading-8">
+          {{ user.name }} {{ user.middle_name }} {{ user.paternal_lastname }}
+          {{ user.maternal_lastname }}
+        </h2>
+        <p
+          class="mt-3 inline-block rounded-md border border-stone-200 px-3 py-1 text-xs dark:border-white/15">
+          {{ user.role_name }}
+        </p>
+        @if (infoSuccess()) {
+          <p role="status" class="mt-4 text-sm text-green-900 dark:text-green-200">
+            {{ infoSuccess() }}
+          </p>
+        }
+        @if (editing()) {
+          <form [formGroup]="infoForm" (ngSubmit)="saveDetails()" class="mt-6" novalidate>
+            <fieldset [disabled]="locked()" class="grid min-w-0 gap-5 sm:grid-cols-2">
+              <legend class="sr-only">Editar información personal</legend>
+              @for (field of fields; track field.key) {
+                <div class="min-w-0">
+                  <label [for]="'profile-' + field.key" class="mb-2 block text-xs"
+                    >{{ field.label }}{{ field.required ? ' *' : '' }}</label
+                  >
+                  <input
+                    [id]="'profile-' + field.key"
+                    [type]="field.type"
+                    [formControlName]="field.key"
+                    [maxlength]="field.max"
+                    [autocomplete]="field.autocomplete"
+                    [required]="field.required"
+                    [attr.aria-invalid]="
+                      infoForm.controls[field.key].touched && infoForm.controls[field.key].invalid
+                    "
+                    [attr.aria-describedby]="
+                      infoForm.controls[field.key].touched && infoForm.controls[field.key].invalid
+                        ? 'profile-' + field.key + '-error'
+                        : null
+                    "
+                    class="w-full min-w-0 rounded-lg border border-stone-300 bg-transparent px-3 py-2.5 text-sm outline-none focus:border-green-800 focus:ring-1 focus:ring-green-800 disabled:opacity-50 dark:border-white/20 dark:focus:border-stone-300 dark:focus:ring-stone-300" />
+                  @if (
+                    infoForm.controls[field.key].touched && infoForm.controls[field.key].invalid
+                  ) {
+                    <p
+                      [id]="'profile-' + field.key + '-error'"
+                      class="mt-2 text-xs text-red-600 dark:text-red-300">
+                      {{
+                        field.type === 'email' ? 'Escribe un correo válido.' : 'Revisa este campo.'
+                      }}
+                    </p>
+                  }
+                </div>
+              }
+            </fieldset>
+            <p class="mt-4 text-xs leading-5 text-stone-500">
+              Si cambias tu correo, úsalo en tu próximo inicio de sesión.
+            </p>
+            @if (infoError()) {
+              <p role="alert" class="mt-4 text-sm text-red-600 dark:text-red-300">
+                {{ infoError() }}
+              </p>
+            }
+            <div class="mt-5 flex flex-wrap gap-3">
+              <button
+                type="submit"
+                [disabled]="locked()"
+                class="rounded-lg bg-green-900 px-4 py-2.5 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+                {{ savingInfo() ? 'Guardando…' : 'Guardar cambios' }}
+              </button>
+              <button
+                type="button"
+                (click)="cancelDetails()"
+                [disabled]="locked()"
+                class="rounded-lg border border-stone-300 px-4 py-2.5 text-xs dark:border-white/20 disabled:opacity-50">
+                Cancelar
+              </button>
+            </div>
+          </form>
+        } @else {
+          <dl
+            class="mt-7 divide-y divide-stone-200 border-y border-stone-200 text-sm dark:divide-white/10 dark:border-white/10">
+            <div class="grid gap-2 py-4 sm:grid-cols-[150px_minmax(0,1fr)]">
+              <dt class="text-stone-500">Nombre</dt>
+              <dd class="break-words">{{ user.name }}</dd>
+            </div>
+            <div class="grid gap-2 py-4 sm:grid-cols-[150px_minmax(0,1fr)]">
+              <dt class="text-stone-500">Segundo nombre</dt>
+              <dd class="break-words">{{ user.middle_name || 'Sin registrar' }}</dd>
+            </div>
+            <div class="grid gap-2 py-4 sm:grid-cols-[150px_minmax(0,1fr)]">
+              <dt class="text-stone-500">Apellido paterno</dt>
+              <dd class="break-words">{{ user.paternal_lastname }}</dd>
+            </div>
+            <div class="grid gap-2 py-4 sm:grid-cols-[150px_minmax(0,1fr)]">
+              <dt class="text-stone-500">Apellido materno</dt>
+              <dd class="break-words">{{ user.maternal_lastname }}</dd>
+            </div>
+            <div class="grid gap-2 py-4 sm:grid-cols-[150px_minmax(0,1fr)]">
+              <dt class="text-stone-500">Correo</dt>
+              <dd class="break-all">{{ user.email }}</dd>
+            </div>
+            <div class="grid gap-2 py-4 sm:grid-cols-[150px_minmax(0,1fr)]">
+              <dt class="text-stone-500">Teléfono</dt>
+              <dd class="break-words">{{ user.phone || 'Sin registrar' }}</dd>
+            </div>
+          </dl>
+        }
+      </section>
+    </div>
+  }
+</div>

@@ -1,0 +1,245 @@
+<section class="mx-auto max-w-6xl">
+  <p class="mb-3 text-xs text-stone-500">Mi rancho / Animales / Genealogía</p>
+  <div class="mb-8 flex flex-wrap items-end justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-semibold tracking-tight">Genealogía</h1>
+      <p class="mt-2 text-sm text-stone-500">
+        Explora los padres, abuelos y descendientes registrados de cada animal.
+      </p>
+    </div>
+    <a routerLink="/dashboard/animals" class="text-xs underline underline-offset-4"
+      >Ir a animales</a
+    >
+  </div>
+  @if (!allowed) {
+    <p class="py-12 text-sm text-stone-500">No tienes permiso para consultar la genealogía.</p>
+  } @else {
+    <div
+      class="grid grid-cols-1 gap-5 border-y border-stone-200 py-6 md:grid-cols-2 dark:border-white/10">
+      <form (submit)="loadOptions(); $event.preventDefault()" class="min-w-0">
+        <label for="genealogy-search" class="mb-2 block text-xs">Buscar por nombre o SINIIGA</label>
+        <div class="flex min-w-0 gap-3">
+          <input
+            id="genealogy-search"
+            [formControl]="search"
+            maxlength="100"
+            class="w-full min-w-0 rounded-lg border border-stone-300 bg-transparent px-3 py-3 text-sm dark:border-white/15" /><button
+            type="submit"
+            [disabled]="optionsLoading()"
+            class="rounded-lg border border-stone-300 px-4 text-xs disabled:opacity-50 dark:border-white/15">
+            {{ optionsLoading() ? 'Buscando…' : 'Buscar' }}
+          </button>
+        </div>
+      </form>
+      <form (submit)="openSelected(); $event.preventDefault()" class="min-w-0">
+        <label for="genealogy-animal" class="mb-2 block text-xs">Animal a consultar</label>
+        <div class="flex min-w-0 gap-3">
+          <select
+            id="genealogy-animal"
+            [formControl]="selected"
+            class="w-full min-w-0 rounded-lg border border-stone-300 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-stone-900">
+            <option value="">Selecciona un animal</option>
+            @for (a of options(); track a.id) {
+              <option [value]="a.id">{{ label(a) }}</option>
+            }</select
+          ><button
+            type="submit"
+            [disabled]="!selected.value"
+            class="rounded-lg bg-green-900 px-4 text-xs text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+            Ver árbol
+          </button>
+        </div>
+      </form>
+    </div>
+    @if (optionError()) {
+      <p role="alert" class="mt-4 text-sm text-amber-700 dark:text-amber-400">
+        {{ optionError() }}
+        <button type="button" (click)="loadOptions()" class="underline">Reintentar</button>
+      </p>
+    }
+    @if (loading()) {
+      <p role="status" class="py-12 text-sm text-stone-500">Cargando genealogía…</p>
+    } @else if (error()) {
+      <p role="alert" class="py-8 text-sm text-red-700 dark:text-red-400">
+        {{ error() }} <button type="button" (click)="load()" class="underline">Reintentar</button>
+      </p>
+    } @else if (family(); as f) {
+      <div class="my-7 flex flex-wrap justify-between gap-3 text-xs text-stone-500">
+        <p>Dos generaciones de antepasados · hijos directos</p>
+        <p>Consulta al {{ f.as_of | date: 'dd/MM/yyyy' }}</p>
+      </div>
+      <div aria-label="Árbol de antepasados" class="min-w-0">
+        <div class="grid grid-cols-1 gap-8 md:grid-cols-2">
+          <section aria-label="Rama materna" class="min-w-0">
+            <h2 class="mb-4 text-xs font-medium text-stone-500">Rama materna</h2>
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <app-family-node
+                relation="Abuela materna"
+                [animal]="f.tree.mother?.mother?.animal || null"
+                (view)="detail.set($event)" /><app-family-node
+                relation="Abuelo materno"
+                [animal]="f.tree.mother?.father?.animal || null"
+                (view)="detail.set($event)" />
+            </div>
+            <div aria-hidden="true" class="mx-auto h-6 w-px bg-stone-300 dark:bg-white/20"></div>
+            <div class="mx-auto max-w-sm">
+              <app-family-node
+                relation="Madre"
+                [animal]="f.tree.mother?.animal || null"
+                (view)="detail.set($event)" />
+            </div>
+          </section>
+          <section aria-label="Rama paterna" class="min-w-0">
+            <h2 class="mb-4 text-xs font-medium text-stone-500">Rama paterna</h2>
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <app-family-node
+                relation="Abuela paterna"
+                [animal]="f.tree.father?.mother?.animal || null"
+                (view)="detail.set($event)" /><app-family-node
+                relation="Abuelo paterno"
+                [animal]="f.tree.father?.father?.animal || null"
+                (view)="detail.set($event)" />
+            </div>
+            <div aria-hidden="true" class="mx-auto h-6 w-px bg-stone-300 dark:bg-white/20"></div>
+            <div class="mx-auto max-w-sm">
+              <app-family-node
+                relation="Padre"
+                [animal]="f.tree.father?.animal || null"
+                (view)="detail.set($event)" />
+            </div>
+          </section>
+        </div>
+        <div
+          aria-hidden="true"
+          class="mx-auto hidden h-6 w-1/2 border-x border-b border-stone-300 md:block dark:border-white/20"></div>
+        <div aria-hidden="true" class="mx-auto h-6 w-px bg-stone-300 dark:bg-white/20"></div>
+        <div data-testid="genealogy-root" class="mx-auto max-w-sm">
+          <app-family-node
+            relation="Animal consultado"
+            [animal]="f.tree.animal"
+            [current]="true"
+            (view)="detail.set($event)" />
+        </div>
+      </div>
+      <section
+        class="mt-10 border-t border-stone-200 pt-7 dark:border-white/10"
+        aria-label="Hijos directos">
+        <div class="mb-5 flex flex-wrap items-end justify-between gap-3">
+          <h2 class="text-lg font-medium">
+            Hijos directos <span class="ml-2 text-sm text-stone-500">{{ f.total_children }}</span>
+          </h2>
+          <p class="text-xs text-stone-500">
+            {{ f.female_children }} {{ f.female_children === 1 ? 'hembra' : 'hembras' }} ·
+            {{ f.male_children }} {{ f.male_children === 1 ? 'macho' : 'machos' }}
+          </p>
+        </div>
+        <p class="mb-6 text-xs leading-relaxed text-stone-500">
+          Los vínculos provienen de los padres registrados en cada ficha. Incluye animales con
+          salida. Abre un familiar para explorar su propio árbol y seguir hacia otras generaciones.
+        </p>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          @for (child of f.children; track child.id) {
+            <div data-child-node>
+              <app-family-node
+                [relation]="child.sex === 'female' ? 'Hija' : 'Hijo'"
+                [animal]="child"
+                (view)="detail.set($event)" />
+            </div>
+          } @empty {
+            <p class="py-6 text-sm text-stone-500 sm:col-span-2 lg:col-span-3">
+              No hay hijos registrados para este animal.
+            </p>
+          }
+        </div>
+        @if (f.total_children > f.limit) {
+          <div class="mt-6 flex flex-wrap items-center justify-end gap-5 text-xs text-stone-500">
+            <span
+              >{{ f.offset + 1 }}–{{ f.offset + f.children.length }} de {{ f.total_children }}</span
+            ><button
+              type="button"
+              (click)="load(f.offset - f.limit)"
+              [disabled]="f.offset === 0"
+              class="disabled:opacity-40">
+              Anterior</button
+            ><button
+              type="button"
+              (click)="load(f.offset + f.limit)"
+              [disabled]="f.offset + f.limit >= f.total_children"
+              class="disabled:opacity-40">
+              Siguiente
+            </button>
+          </div>
+        }
+      </section>
+    } @else {
+      <p class="py-12 text-sm text-stone-500">
+        Selecciona un animal y pulsa Ver árbol. También puedes abrir su genealogía desde la lista de
+        Animales.
+      </p>
+    }
+  }
+</section>
+@if (detail(); as a) {
+  <app-modal title="Ficha del animal" (dismiss)="detail.set(null)">
+    <h3 class="break-words text-xl font-medium">{{ a.name || a.siniiga }}</h3>
+    <p class="mt-2 text-sm text-stone-500">{{ a.siniiga || 'SINIIGA pendiente' }}</p>
+    <dl class="mt-6 grid grid-cols-2 gap-6 text-sm">
+      <div>
+        <dt class="mb-1 text-xs text-stone-500">Sexo</dt>
+        <dd>{{ sexLabel(a.sex) }}</dd>
+      </div>
+      <div>
+        <dt class="mb-1 text-xs text-stone-500">Nacimiento</dt>
+        <dd>{{ a.birth_date ? (a.birth_date | date: 'dd/MM/yyyy') : 'Desconocido' }}</dd>
+      </div>
+      <div>
+        <dt class="mb-1 text-xs text-stone-500">Estado</dt>
+        <dd>
+          {{ status(a.status || 'active') }}
+          @if (a.exit_date) {
+            · {{ a.exit_date | date: 'dd/MM/yyyy' }}
+          }
+        </dd>
+      </div>
+      <div>
+        <dt class="mb-1 text-xs text-stone-500">Origen</dt>
+        <dd>{{ originLabel(a.origin) }}</dd>
+      </div>
+      <div>
+        <dt class="mb-1 text-xs text-stone-500">Reproductor</dt>
+        <dd>{{ a.is_breeder ? 'Sí' : 'No' }}</dd>
+      </div>
+      <div>
+        <dt class="mb-1 text-xs text-stone-500">Madre</dt>
+        <dd class="break-words">{{ a.mother ? label(a.mother) : 'No registrada' }}</dd>
+      </div>
+      <div>
+        <dt class="mb-1 text-xs text-stone-500">Padre</dt>
+        <dd class="break-words">{{ a.father ? label(a.father) : 'No registrado' }}</dd>
+      </div>
+      <div class="col-span-2 border-t border-stone-200 pt-5 dark:border-white/10">
+        <dt class="mb-2 text-xs text-stone-500">Composición racial</dt>
+        <dd>
+          @for (share of a.breeds; track share.breed_id) {
+            <p>{{ share.name }} · {{ share.percentage | number: '1.0-2' }} %</p>
+          } @empty {
+            Sin composición racial registrada.
+          }
+        </dd>
+      </div>
+    </dl>
+    <div class="mt-7 flex flex-wrap justify-end gap-4">
+      <button
+        type="button"
+        (click)="detail.set(null)"
+        class="rounded-lg border border-stone-200 px-4 py-3 text-xs dark:border-white/15">
+        Cerrar</button
+      ><a
+        [routerLink]="['/dashboard/genealogy', a.id]"
+        (click)="detail.set(null)"
+        class="rounded-lg bg-green-900 px-4 py-3 text-xs text-white dark:bg-stone-100 dark:text-stone-950"
+        >Explorar su familia</a
+      >
+    </div>
+  </app-modal>
+}

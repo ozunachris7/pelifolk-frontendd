@@ -1,0 +1,242 @@
+<section class="mx-auto max-w-6xl">
+  <p class="mb-3 text-xs text-stone-500">Mi rancho / Economía / Costos</p>
+  <h1 class="text-2xl font-semibold tracking-tight">Costos por animal o lote</h1>
+  <p class="mt-2 text-sm text-stone-500">
+    Consulta los gastos asignados y los consumos de alimentación por separado.
+  </p>
+  <nav
+    aria-label="Economía"
+    class="my-7 flex flex-wrap gap-6 border-b border-stone-200 text-sm dark:border-white/10">
+    <a routerLink="/dashboard/finance" class="pb-3 text-stone-500">Movimientos y catálogos</a
+    ><span aria-current="page" class="border-b-2 border-green-800 pb-3 dark:border-green-400"
+      >Costos por animal o lote</span
+    >
+    <a routerLink="/dashboard/finance/profitability" class="pb-3 text-stone-500">Resultado por animal</a>
+  </nav>
+  @if (!allowed) {
+    <p class="py-12 text-sm text-stone-500">No tienes permiso para consultar Economía.</p>
+  } @else {
+    <form
+      [formGroup]="form"
+      (ngSubmit)="apply()"
+      class="grid grid-cols-1 gap-4 border-b border-stone-200 pb-6 sm:grid-cols-2 lg:grid-cols-4 dark:border-white/10">
+      <div class="min-w-0">
+        <label for="cost-kind" class="mb-2 block text-xs">Tipo de destino</label
+        ><select
+          id="cost-kind"
+          formControlName="kind"
+          (change)="changeKind()"
+          class="w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-stone-900">
+          <option value="animal">Animal</option>
+          <option value="group">Lote</option>
+        </select>
+      </div>
+      <div class="min-w-0">
+        <label for="cost-target" class="mb-2 block text-xs">Destino</label
+        ><select
+          id="cost-target"
+          formControlName="target_id"
+          class="w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-stone-900">
+          <option value="">Selecciona un destino</option>
+          @for (t of options(); track t.id) {
+            <option [value]="t.id">{{ label(t) }}</option>
+          }
+        </select>
+      </div>
+      <div class="min-w-0">
+        <label for="cost-from" class="mb-2 block text-xs">Desde</label
+        ><input
+          id="cost-from"
+          type="date"
+          formControlName="date_from"
+          class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+      </div>
+      <div class="min-w-0">
+        <label for="cost-to" class="mb-2 block text-xs">Hasta</label
+        ><input
+          id="cost-to"
+          type="date"
+          formControlName="date_to"
+          class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+      </div>
+      <div class="min-w-0 sm:col-span-2">
+        <label for="cost-search" class="mb-2 block text-xs">Buscar destino en las opciones</label>
+        <div class="flex gap-3">
+          <input
+            id="cost-search"
+            [formControl]="search"
+            maxlength="100"
+            class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" /><button
+            type="button"
+            (click)="loadOptions()"
+            [disabled]="optionsLoading()"
+            class="rounded-lg border border-stone-200 px-4 text-xs dark:border-white/15">
+            {{ optionsLoading() ? 'Buscando…' : 'Buscar' }}
+          </button>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-end gap-4 sm:col-span-2">
+        <button
+          type="submit"
+          [disabled]="loading()"
+          class="rounded-lg border border-stone-200 px-4 py-3 text-xs disabled:opacity-50 dark:border-white/15">
+          Consultar costos
+        </button>
+        <p class="pb-2 text-xs text-stone-500">Sin fechas se consulta todo el historial.</p>
+      </div>
+    </form>
+    @if (optionError()) {
+      <p role="alert" class="mt-4 text-xs text-red-700 dark:text-red-400">{{ optionError() }}</p>
+    }
+    @if (error()) {
+      <p role="alert" class="mt-5 text-sm text-red-700 dark:text-red-400">{{ error() }}</p>
+    }
+    @if (loading()) {
+      <p role="status" class="py-12 text-sm text-stone-500">Consultando costos…</p>
+    } @else if (!error()) {
+      @if (page(); as p) {
+        <div class="my-7 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 class="text-lg font-medium">{{ label(p.target) }}</h2>
+            <p class="mt-2 text-xs text-stone-500">
+              {{ p.date_from ? (p.date_from | date: 'dd/MM/yyyy') : 'Inicio del historial' }} —
+              {{ p.date_to ? (p.date_to | date: 'dd/MM/yyyy') : 'Sin límite' }}
+            </p>
+          </div>
+          <p class="text-xs text-stone-500">Consulta al {{ p.as_of | date: 'dd/MM/yyyy' }}</p>
+        </div>
+        <div
+          class="mb-6 grid grid-cols-1 gap-6 border-b border-stone-200 pb-6 sm:grid-cols-2 dark:border-white/10">
+          <div data-testid="assigned-cost">
+            <h3 class="text-xs text-stone-500">Gastos registrados asignados</h3>
+            <p class="mt-3 text-2xl font-semibold">
+              {{ p.assigned_expenses | currency: 'MXN' : 'symbol' : '1.2-2' }}
+            </p>
+            <p class="mt-2 text-xs text-stone-500">
+              {{ p.total }} {{ p.total === 1 ? 'asignación' : 'asignaciones' }} de gastos
+            </p>
+          </div>
+          @if (p.feeding; as feed) {
+            <div data-testid="feeding-cost">
+              <h3 class="text-xs text-stone-500">Costo conocido de alimentación</h3>
+              <p class="mt-3 text-2xl font-semibold">
+                {{ feed.total_cost | currency: 'MXN' : 'symbol' : '1.2-2' }}
+              </p>
+              <p class="mt-2 text-xs text-stone-500">
+                {{ feed.total }} {{ feed.total === 1 ? 'consumo' : 'consumos' }} ·
+                {{ feed.unpriced_count }} sin precio
+              </p>
+            </div>
+          }
+        </div>
+        <p class="mb-3 text-xs leading-relaxed text-stone-500">
+          Los gastos asignados ya forman parte de Economía. La alimentación se calcula desde los
+          consumos y sus precios vigentes; puede corresponder a compras ya registradas como gastos.
+          Los dos importes se muestran separados para evitar duplicarlos.
+        </p>
+        <p class="mb-6 text-xs leading-relaxed text-stone-500">
+          {{
+            p.kind === 'animal'
+              ? 'Los importes anteriores corresponden al animal y sus casos sanitarios. Consulta aparte el reparto calculado de sus lotes.'
+              : 'Los importes anteriores corresponden al lote completo. El reparto calculado entre sus miembros está disponible abajo.'
+          }}
+          Los gastos generales sin asignación no se incluyen. Los totales corresponden a todos los
+          resultados filtrados.
+        </p>
+        @if (p.feeding?.unpriced_count) {
+          <p class="mb-5 text-xs text-amber-700 dark:text-amber-400">
+            Hay consumos sin precio vigente; su costo es desconocido y no se incluye en
+            alimentación.
+          </p>
+        }
+        <app-group-cost-distribution
+          [revision]="distributionRevision()"
+          [kind]="p.kind"
+          [targetId]="p.target.id"
+          [dateFrom]="p.date_from || ''"
+          [dateTo]="p.date_to || ''" />
+        <div
+          class="min-w-0 overflow-x-auto rounded-xl border border-stone-200 dark:border-white/10">
+          <table class="w-full min-w-[900px] text-left text-sm">
+            <thead class="bg-stone-50 text-xs text-stone-500 dark:bg-white/5">
+              <tr>
+                <th class="p-4 font-normal">Fecha / categoría</th>
+                <th class="p-4 font-normal">Descripción</th>
+                <th class="p-4 text-right font-normal">Gasto completo</th>
+                <th class="p-4 text-right font-normal">Porcentaje</th>
+                <th class="p-4 text-right font-normal">Importe asignado</th>
+                <th class="p-4 font-normal">Vía / acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of p.items; track r.allocation_id) {
+                <tr data-cost-row class="border-t border-stone-200 align-top dark:border-white/10">
+                  <td class="p-4">
+                    <p class="whitespace-nowrap">{{ r.date | date: 'dd/MM/yyyy' }}</p>
+                    <p class="mt-1 text-xs text-stone-500">{{ categoryLabel(r.category.name) }}</p>
+                  </td>
+                  <td class="max-w-64 break-words p-4">{{ r.description || 'Sin descripción' }}</td>
+                  <td class="whitespace-nowrap p-4 text-right">
+                    {{ r.expense_amount | currency: 'MXN' : 'symbol' : '1.2-2' }}
+                  </td>
+                  <td class="whitespace-nowrap p-4 text-right">{{ r.percentage }} %</td>
+                  <td class="whitespace-nowrap p-4 text-right font-medium">
+                    {{ r.amount | currency: 'MXN' : 'symbol' : '1.2-2' }}
+                  </td>
+                  <td class="p-4">
+                    <p class="text-xs text-stone-500">
+                      {{
+                        r.via === 'health_case'
+                          ? 'Caso sanitario'
+                          : r.via === 'group'
+                            ? 'Lote'
+                            : 'Animal'
+                      }}
+                    </p>
+                    <button
+                      type="button"
+                      (click)="inspect(r)"
+                      class="mt-3 whitespace-nowrap text-xs underline underline-offset-4">
+                      Ver asignación
+                    </button>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="6" class="p-10 text-center text-stone-500">
+                    No hay gastos asignados a este destino en el período.
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-5 flex flex-wrap justify-end gap-5 text-xs text-stone-500">
+          <span
+            >{{ p.total ? p.offset + 1 : 0 }}–{{ p.offset + p.items.length }} de {{ p.total }}</span
+          ><button
+            type="button"
+            (click)="load(p.offset - p.limit)"
+            [disabled]="p.offset === 0"
+            class="disabled:opacity-40">
+            Anterior</button
+          ><button
+            type="button"
+            (click)="load(p.offset + p.limit)"
+            [disabled]="p.offset + p.limit >= p.total"
+            class="disabled:opacity-40">
+            Siguiente
+          </button>
+        </div>
+      } @else {
+        <p class="py-12 text-sm text-stone-500">
+          Selecciona un animal o lote y pulsa Consultar costos. Para asignar un gasto, abre Economía
+          → Gastos y pulsa Asignar.
+        </p>
+      }
+    }
+  }
+</section>
+@if (selected(); as expense) {
+  <app-allocation-editor [expense]="expense" (dismiss)="selected.set(null)" (saved)="saved()" />
+}

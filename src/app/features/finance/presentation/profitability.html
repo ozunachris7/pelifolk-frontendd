@@ -1,0 +1,446 @@
+@if (!selected()) {
+  <section class="mx-auto max-w-6xl">
+    <header class="mb-7">
+      <p class="text-xs text-stone-500">Mi rancho / Economía</p>
+      <h1 class="mt-3 text-2xl font-medium tracking-tight">Resultado por animal</h1>
+      <p class="mt-3 max-w-3xl text-sm leading-6 text-stone-500">
+        Ingresos vinculados menos gastos registrados atribuidos, incluidos casos sanitarios y
+        repartos de lote. Consulta el origen de cada importe y los movimientos pendientes de
+        asignación.
+      </p>
+    </header>
+    <nav
+      aria-label="Economía"
+      class="mb-7 flex flex-wrap gap-6 border-b border-stone-200 text-sm dark:border-white/10">
+      <a routerLink="/dashboard/finance" class="pb-3 text-stone-500">Movimientos y catálogos</a
+      ><a routerLink="/dashboard/finance/costs" class="pb-3 text-stone-500"
+        >Costos por animal o lote</a
+      ><span aria-current="page" class="border-b-2 border-green-800 pb-3 dark:border-green-200"
+        >Resultado por animal</span
+      >
+    </nav>
+    @if (!allowed()) {
+      <p class="py-10 text-sm text-stone-500">No tienes permiso para consultar Economía.</p>
+    } @else {
+      <form
+        [formGroup]="form"
+        (ngSubmit)="apply()"
+        class="mb-6 grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <app-profit-animal-select
+          (selectedChange)="chooseAnimal($event)"
+          (pendingChange)="animalPending.set($event)" />
+        <label class="flex min-w-0 flex-col text-xs leading-4"
+          >Estado al corte<select
+            id="profit-status"
+            formControlName="status"
+            class="mt-2 h-12 min-w-0 w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+            <option value="all">Todos</option>
+            <option value="active">Activos</option>
+            <option value="exited">Con salida</option>
+          </select></label
+        ><label class="flex min-w-0 flex-col text-xs leading-4"
+          >Desde<input
+            id="profit-from"
+            formControlName="date_from"
+            type="date"
+            class="mt-2 h-12 min-w-0 w-full rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" /></label
+        ><label class="flex min-w-0 flex-col text-xs leading-4"
+          >Hasta<input
+            id="profit-to"
+            formControlName="date_to"
+            type="date"
+            class="mt-2 h-12 min-w-0 w-full rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15"
+        /></label>
+        <div
+          class="flex flex-col items-start gap-3 sm:col-span-2 sm:flex-row sm:items-center lg:col-span-4">
+          <button
+            [disabled]="loading()"
+            class="shrink-0 rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-40 dark:bg-stone-100 dark:text-stone-950">
+            Consultar resultado
+          </button>
+          <p class="min-w-0 text-xs leading-5 text-stone-500">
+            Selecciona un animal de la lista y pulsa Consultar resultado. Limpia la selección para
+            ver todos. Sin fechas se consulta todo el historial hasta hoy. Se usa la fecha de
+            registro de cada ingreso o gasto.
+          </p>
+        </div>
+      </form>
+      <p class="mb-6 text-xs leading-6 text-stone-500">
+        Base del cálculo: gastos registrados, incluidas compras de alimento y medicamentos cuando
+        estén capturadas y asignadas. Los consumos calculados se muestran aparte y no se vuelven a
+        sumar. Este resultado corresponde a los registros disponibles; no certifica utilidad final,
+        valor del inventario ni costos que no se hayan registrado.
+      </p>
+      <div class="mb-6 flex flex-wrap gap-6 border-b border-stone-200 text-xs dark:border-white/10">
+        <button
+          (click)="changeView('animals')"
+          [attr.aria-pressed]="view() === 'animals'"
+          class="pb-3"
+          [class.font-semibold]="view() === 'animals'">
+          Por animal</button
+        ><button
+          (click)="changeView('expenses')"
+          [attr.aria-pressed]="view() === 'expenses'"
+          class="pb-3"
+          [class.font-semibold]="view() === 'expenses'">
+          Gastos pendientes de atribuir</button
+        ><button
+          (click)="changeView('incomes')"
+          [attr.aria-pressed]="view() === 'incomes'"
+          class="pb-3"
+          [class.font-semibold]="view() === 'incomes'">
+          Ingresos sin animal
+        </button>
+      </div>
+      @if (error()) {
+        <p role="alert" class="py-5 text-sm text-red-600">
+          {{ error() }} <button (click)="load()" class="underline">Reintentar</button>
+        </p>
+      }
+      @if (loading()) {
+        <p class="py-10 text-sm text-stone-500">Consultando resultados y cobertura…</p>
+      } @else if (!error()) {
+        @if (page(); as p) {
+          <div class="mb-7 border-y border-stone-200 py-4 text-xs leading-6 dark:border-white/10">
+            <p class="font-medium">Cobertura de todo el rancho para el periodo consultado</p>
+            <p class="mt-1 text-stone-500">
+              {{ p.coverage.pending_expense_count }} gastos con importe pendiente:
+              {{ p.coverage.pending_expenses | currency: 'MXN' : 'symbol' : '1.2-2' }} ·
+              {{ p.coverage.pending_income_count }} ingresos sin animal:
+              {{ p.coverage.pending_income | currency: 'MXN' : 'symbol' : '1.2-2' }}
+            </p>
+            <p class="text-stone-500">
+              {{
+                p.coverage.status === 'pending_attribution'
+                  ? 'Hay movimientos pendientes. Los resultados por animal son parciales respecto de esos importes.'
+                  : 'Los movimientos del periodo están atribuidos según los registros disponibles.'
+              }}
+              Los filtros de animal y estado no reducen esta cobertura del rancho.
+            </p>
+          </div>
+          @if (view() === 'animals') {
+            @if (!p.total) {
+              <p
+                role="status"
+                class="mb-6 rounded-lg border border-stone-200 px-4 py-4 text-sm dark:border-white/15">
+                No hay animales con los filtros seleccionados. Revisa el estado al corte o limpia la
+                selección de animal.
+              </p>
+            } @else if (noActivity()) {
+              <p
+                role="status"
+                class="mb-6 rounded-lg border border-stone-200 px-4 py-4 text-sm dark:border-white/15">
+                No hay ingresos ni gastos atribuidos a los animales seleccionados en este periodo.
+                Revisa las fechas y los movimientos pendientes de asignación. Las referencias de
+                alimentación y medicamentos se consultan por separado.
+              </p>
+            }
+            <div
+              class="mb-7 flex flex-wrap gap-x-10 gap-y-5 border-b border-stone-200 pb-5 dark:border-white/10">
+              <div>
+                <h2 class="text-xs text-stone-500">Ingresos de los animales filtrados</h2>
+                <p class="mt-2 text-xl font-medium">
+                  {{ p.summary.income | currency: 'MXN' : 'symbol' : '1.2-2' }}
+                </p>
+              </div>
+              <div>
+                <h2 class="text-xs text-stone-500">Costo registrado atribuido</h2>
+                <p class="mt-2 text-xl font-medium">
+                  {{ p.summary.expenses | currency: 'MXN' : 'symbol' : '1.2-2' }}
+                </p>
+              </div>
+              <div>
+                <h2 class="text-xs text-stone-500">Resultado sobre esos registros</h2>
+                <p class="mt-2 text-xl font-medium" data-profit-result>
+                  {{ p.summary.result | currency: 'MXN' : 'symbol' : '1.2-2' }}
+                </p>
+              </div>
+            </div>
+            <div class="relative overflow-x-auto">
+              <table class="w-full min-w-[930px] text-left text-sm">
+                <thead
+                  class="border-b border-stone-200 text-xs text-stone-500 dark:border-white/10">
+                  <tr>
+                    <th class="px-3 py-4 font-medium">Animal</th>
+                    <th class="px-3 py-4 text-right font-medium">Ingresos vinculados</th>
+                    <th class="px-3 py-4 text-right font-medium">Gastos directos y casos</th>
+                    <th class="px-3 py-4 text-right font-medium">Gastos de lotes atribuidos</th>
+                    <th class="px-3 py-4 text-right font-medium">Costo registrado total</th>
+                    <th class="px-3 py-4 text-right font-medium">Resultado</th>
+                    <th class="px-3 py-4 font-medium">Detalle</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (r of p.items; track r.animal.id) {
+                    <tr
+                      data-profit-row
+                      class="border-b border-stone-200 align-top dark:border-white/10">
+                      <td class="max-w-xs px-3 py-5">
+                        <p class="break-words font-medium">{{ label(r.animal) }}</p>
+                        <p class="mt-1 text-xs text-stone-500">
+                          {{ statusLabel(r.status) }} · {{ r.income_count }} ingresos ·
+                          {{ r.expense_count }} partes de gasto
+                        </p>
+                      </td>
+                      <td class="px-3 py-5 text-right">
+                        {{ r.income | currency: 'MXN' : 'symbol' : '1.2-2' }}
+                      </td>
+                      <td class="px-3 py-5 text-right">
+                        <p>{{ r.direct_expenses | currency: 'MXN' : 'symbol' : '1.2-2' }}</p>
+                        <p class="mt-1 text-xs text-stone-500">
+                          Casos: {{ r.case_expenses | currency: 'MXN' : 'symbol' : '1.2-2' }}
+                        </p>
+                      </td>
+                      <td class="px-3 py-5 text-right">
+                        {{ r.group_expenses | currency: 'MXN' : 'symbol' : '1.2-2' }}
+                      </td>
+                      <td class="px-3 py-5 text-right font-medium">
+                        {{ r.expenses | currency: 'MXN' : 'symbol' : '1.2-2' }}
+                      </td>
+                      <td class="px-3 py-5 text-right font-medium">
+                        {{ r.result | currency: 'MXN' : 'symbol' : '1.2-2' }}
+                      </td>
+                      <td class="px-3 py-5">
+                        <button
+                          (click)="open(r)"
+                          [attr.aria-label]="'Ver resultado de ' + label(r.animal)"
+                          title="Ver origen de ingresos y costos"
+                          class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-stone-200 hover:bg-stone-100 dark:border-white/15 dark:hover:bg-white/5">
+                          <lucide-icon [img]="eye" [size]="17" />
+                        </button>
+                      </td>
+                    </tr>
+                  } @empty {
+                    <tr>
+                      <td colspan="7" class="py-10 text-center text-stone-500">
+                        Sin animales con estos filtros.
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            <div class="mt-5 flex justify-between gap-4 text-xs text-stone-500">
+              <span>{{ p.total }} animales · Al {{ p.as_of | date: 'dd/MM/yyyy' : 'UTC' }}</span>
+              <div class="flex gap-4">
+                <button
+                  [disabled]="p.offset === 0"
+                  (click)="load(p.offset - 25)"
+                  class="disabled:opacity-40">
+                  Anterior</button
+                ><button
+                  [disabled]="p.offset + 25 >= p.total"
+                  (click)="load(p.offset + 25)"
+                  class="disabled:opacity-40">
+                  Siguiente
+                </button>
+              </div>
+            </div>
+          } @else {
+            <p class="mb-5 text-xs leading-6 text-stone-500">
+              Pendientes de todo el rancho en el periodo consultado.
+              {{
+                view() === 'expenses'
+                  ? 'Incluye gastos generales sin asignar y porciones de lote sin miembros elegibles. Asigna explícitamente los gastos o revisa el historial del lote.'
+                  : 'Vincula el ingreso a una venta o a un animal desde Economía. El importe completo se atribuirá al destino que selecciones.'
+              }}
+            </p>
+            @if (pending(); as list) {
+              <div class="relative overflow-x-auto">
+                <table class="w-full min-w-[620px] text-left text-sm">
+                  <thead
+                    class="border-b border-stone-200 text-xs text-stone-500 dark:border-white/10">
+                    <tr>
+                      <th class="px-3 py-4 font-medium">Fecha</th>
+                      <th class="px-3 py-4 font-medium">Descripción</th>
+                      <th class="px-3 py-4 text-right font-medium">
+                        {{ view() === 'expenses' ? 'Importe pendiente' : 'Ingreso sin animal' }}
+                      </th>
+                      <th class="px-3 py-4 font-medium">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (r of list.items; track r.id) {
+                      <tr class="border-b border-stone-200 dark:border-white/10">
+                        <td class="px-3 py-4">{{ r.date | date: 'dd/MM/yyyy' : 'UTC' }}</td>
+                        <td class="max-w-sm break-words px-3 py-4">
+                          {{ r.description || 'Sin descripción' }}
+                        </td>
+                        <td class="px-3 py-4 text-right">
+                          {{
+                            (view() === 'expenses' ? r.pending_amount : r.amount)
+                              | currency: 'MXN' : 'symbol' : '1.2-2'
+                          }}
+                        </td>
+                        <td class="px-3 py-4">
+                          @if (view() === 'expenses' && canWrite()) {
+                            <button
+                              (click)="allocating.set(r.record)"
+                              aria-label="Asignar gasto pendiente"
+                              title="Asignar gasto"
+                              class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-stone-200 dark:border-white/15">
+                              <lucide-icon [img]="pencil" [size]="17" />
+                            </button>
+                          } @else if (view() === 'incomes') {
+                            <a
+                              routerLink="/dashboard/finance"
+                              [queryParams]="{ income_id: r.id }"
+                              aria-label="Ver ingreso en Economía"
+                              title="Ver ingreso en Economía"
+                              class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-stone-200 dark:border-white/15"
+                              ><lucide-icon [img]="canWrite() ? pencil : eye" [size]="17"
+                            /></a>
+                          } @else {
+                            <span class="text-xs text-stone-500">Requiere permiso de edición</span>
+                          }
+                        </td>
+                      </tr>
+                    } @empty {
+                      <tr>
+                        <td colspan="4" class="py-8 text-center text-stone-500">
+                          Sin movimientos pendientes en esta sección.
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+              <div class="mt-5 flex justify-between text-xs">
+                <span>{{ list.total }} registros</span>
+                <div class="flex gap-4">
+                  <button
+                    [disabled]="list.offset === 0"
+                    (click)="load(list.offset - 25)"
+                    class="disabled:opacity-40">
+                    Anterior</button
+                  ><button
+                    [disabled]="list.offset + 25 >= list.total"
+                    (click)="load(list.offset + 25)"
+                    class="disabled:opacity-40">
+                    Siguiente
+                  </button>
+                </div>
+              </div>
+            }
+          }
+        }
+      }
+    }
+  </section>
+}
+@if (selected(); as row) {
+  <app-detail-page title="Resultado y registros de origen" (dismiss)="close()"
+    ><h3 class="break-words text-lg font-medium">{{ label(row.animal) }}</h3>
+    <div class="my-5 space-y-2 border-y border-stone-200 py-4 text-sm dark:border-white/10">
+      <p>Ingresos vinculados: {{ row.income | currency: 'MXN' : 'symbol' : '1.2-2' }}</p>
+      <p>Costo registrado atribuido: {{ row.expenses | currency: 'MXN' : 'symbol' : '1.2-2' }}</p>
+      <p class="font-medium">Resultado: {{ row.result | currency: 'MXN' : 'symbol' : '1.2-2' }}</p>
+    </div>
+    @if (row.feeding || row.medicines) {
+      <section class="mb-6 space-y-3">
+        <h4 class="text-sm font-medium">Referencias de uso · fuera de la suma anterior</h4>
+        @if (row.feeding; as f) {
+          <p class="text-xs leading-6">
+            Alimentación conocida: {{ f.known_cost | currency: 'MXN' : 'symbol' : '1.2-2' }} ·
+            {{ f.records }} consumos · {{ f.unpriced }} sin precio.
+          </p>
+        }
+        @if (row.medicines; as m) {
+          <p class="text-xs leading-6">
+            Medicamentos conocidos: {{ m.known_cost | currency: 'MXN' : 'symbol' : '1.2-2' }} ·
+            {{ m.applications }} aplicaciones · {{ m.unpriced }} sin determinar.
+          </p>
+        }
+        <p class="text-xs leading-6 text-stone-500">
+          Estas valoraciones pueden corresponder a compras ya registradas como gasto y no se agregan
+          otra vez al costo. Cero registros no confirma ausencia de consumo real.
+        </p>
+      </section>
+    }
+    <div class="mb-5 flex flex-wrap gap-4 border-b border-stone-200 text-xs dark:border-white/10">
+      @for (s of sections; track s.key) {
+        @if (
+          s.key === 'incomes' ||
+          s.key === 'expenses' ||
+          (s.key === 'feeding' && row.feeding) ||
+          (s.key === 'medicines' && row.medicines)
+        ) {
+          <button
+            (click)="changeSection(s.key)"
+            [attr.aria-pressed]="section() === s.key"
+            class="pb-3"
+            [class.font-semibold]="section() === s.key">
+            {{ s.label }}
+          </button>
+        }
+      }
+    </div>
+    @if (detailLoading()) {
+      <p class="text-xs text-stone-500">Consultando registros…</p>
+    } @else if (detailError()) {
+      <p role="alert" class="text-sm text-red-600">
+        {{ detailError() }} <button (click)="loadDetail()" class="underline">Reintentar</button>
+      </p>
+    } @else if (detail(); as d) {
+      <ol class="space-y-5">
+        @for (r of d.items; track r.id) {
+          <li class="border-b border-stone-200 pb-4 dark:border-white/10">
+            <p class="text-xs text-stone-500">
+              {{ r.date | date: 'dd/MM/yyyy' : 'UTC' }} · {{ via(r.via) }}
+              @if (r.group_name) {
+                · {{ r.group_name }}
+              }
+            </p>
+            <p class="mt-2 whitespace-pre-wrap break-words text-sm">{{ r.title }}</p>
+            <p class="mt-2 text-sm font-medium">
+              {{
+                r.amount !== null
+                  ? (r.amount | currency: 'MXN' : 'symbol' : '1.2-2')
+                  : 'Sin determinar'
+              }}
+            </p>
+            @if (r.unknown_reason) {
+              <p class="mt-1 text-xs text-stone-500">
+                {{
+                  r.unknown_reason === 'unit_mismatch'
+                    ? 'Unidad de dosis distinta del producto.'
+                    : section() === 'feeding'
+                      ? 'Sin precio vigente para este consumo.'
+                      : 'Sin precio vigente en la fecha de aplicación.'
+                }}
+              </p>
+            }
+            @if (r.original_amount) {
+              <p class="mt-1 text-xs text-stone-500">
+                Gasto original: {{ r.original_amount | currency: 'MXN' : 'symbol' : '1.2-2' }}
+              </p>
+            }
+          </li>
+        } @empty {
+          <li class="py-4 text-xs text-stone-500">
+            Sin registros de esta sección en el periodo consultado.
+          </li>
+        }
+      </ol>
+      <div class="mt-5 flex justify-between text-xs">
+        <span>{{ d.total }} registros</span>
+        <div class="flex gap-4">
+          <button
+            [disabled]="d.offset === 0"
+            (click)="loadDetail(d.offset - 25)"
+            class="disabled:opacity-40">
+            Anterior</button
+          ><button
+            [disabled]="d.offset + 25 >= d.total"
+            (click)="loadDetail(d.offset + 25)"
+            class="disabled:opacity-40">
+            Siguiente
+          </button>
+        </div>
+      </div>
+    }
+  </app-detail-page>
+}
+@if (allocating(); as expense) {
+  <app-allocation-editor [expense]="expense" (dismiss)="allocating.set(null)" (saved)="saved()" />
+}

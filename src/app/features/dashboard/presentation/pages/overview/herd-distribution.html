@@ -1,0 +1,148 @@
+<section
+  aria-labelledby="herd-distribution-title"
+  class="min-w-0 border-y border-stone-200 py-7 dark:border-white/10">
+  <div class="mb-7 flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h2 id="herd-distribution-title" class="text-base font-medium">Distribución del hato</h2>
+      <p class="mt-2 text-xs text-stone-500">
+        Estado de los animales registrados al {{ asOf() | date: 'dd/MM/yyyy' : 'UTC' }}.
+      </p>
+    </div>
+    <a
+      routerLink="/dashboard/animals"
+      class="rounded-lg border border-stone-200 px-3 py-2 text-xs dark:border-white/15"
+      >Ver animales</a
+    >
+  </div>
+  @if (herd().total === 0) {
+    <p role="status" class="py-8 text-sm text-stone-500">
+      Todavía no hay animales registrados para mostrar su distribución.
+    </p>
+  } @else {
+    <div class="grid min-w-0 gap-8 lg:grid-cols-2 lg:gap-10">
+      <section aria-labelledby="herd-sex-title" class="min-w-0">
+        <h3 id="herd-sex-title" class="text-sm font-medium">Sexo de los animales activos</h3>
+        <p class="mt-2 text-xs leading-5 text-stone-500 lg:min-h-10">
+          {{ herd().active }} {{ herd().active === 1 ? 'animal activo' : 'animales activos' }}. Esta
+          distribución excluye las bajas.
+        </p>
+        @if (herd().active > 0) {
+          <app-chart
+            data-testid="herd-sex-chart"
+            class="mt-4 block min-w-0"
+            [model]="sexModel()"
+            label="Distribución por sexo de los animales activos"
+            [selectedIndex]="sexIndex()"
+            (selectIndex)="sexIndex.set($event)" />
+          @if (selectedSex(); as row) {
+            <p
+              role="status"
+              aria-live="polite"
+              data-testid="herd-sex-selection"
+              class="mt-4 border-l-2 border-green-800 py-2 pl-3 text-sm dark:border-green-500">
+              <span class="font-medium">{{ row.label }}</span> · {{ row.count }}
+              {{ row.count === 1 ? 'animal' : 'animales' }} ·
+              {{ (row.count / herd().active) * 100 | number: '1.1-1' }} % de los activos
+            </p>
+          }
+        } @else {
+          <p role="status" class="py-10 text-sm text-stone-500">
+            No hay animales activos para comparar por sexo.
+          </p>
+        }
+        <details class="mt-5">
+          <summary class="w-fit cursor-pointer text-xs underline underline-offset-4">
+            Ver cantidades por sexo
+          </summary>
+          <table class="mt-4 w-full text-left text-xs">
+            <caption class="sr-only">
+              Sexo de los animales activos
+            </caption>
+            <thead class="border-b border-stone-200 text-stone-500 dark:border-white/10">
+              <tr>
+                <th scope="col" class="py-3 font-medium">Sexo</th>
+                <th scope="col" class="py-3 text-right font-medium">Cantidad</th>
+                <th scope="col" class="py-3 text-right font-medium">% de activos</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-stone-200 dark:divide-white/10">
+              @for (row of sexRows(); track row.label) {
+                <tr>
+                  <th scope="row" class="py-3 font-normal">{{ row.label }}</th>
+                  <td class="py-3 text-right">{{ row.count }}</td>
+                  <td class="py-3 text-right">
+                    {{
+                      herd().active
+                        ? ((row.count / herd().active) * 100 | number: '1.1-1') + ' %'
+                        : '—'
+                    }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </details>
+      </section>
+      <section
+        aria-labelledby="herd-state-title"
+        class="min-w-0 border-t border-stone-200 pt-7 lg:border-l lg:border-t-0 lg:pl-10 lg:pt-0 dark:border-white/10">
+        <h3 id="herd-state-title" class="text-sm font-medium">Activos y bajas</h3>
+        <p class="mt-2 text-xs leading-5 text-stone-500 lg:min-h-10">
+          {{ herd().total }}
+          {{ herd().total === 1 ? 'animal registrado' : 'animales registrados' }}. Las bajas agrupan
+          las salidas registradas al corte.
+        </p>
+        <app-chart
+          data-testid="herd-state-chart"
+          class="mt-4 block min-w-0"
+          [model]="stateModel()"
+          label="Animales activos y bajas del hato registrado"
+          [selectedIndex]="stateIndex()"
+          (selectIndex)="stateIndex.set($event)" />
+        @if (selectedState(); as row) {
+          <p
+            role="status"
+            aria-live="polite"
+            data-testid="herd-state-selection"
+            class="mt-4 border-l-2 border-green-800 py-2 pl-3 text-sm dark:border-green-500">
+            <span class="font-medium">{{ row.label }}</span> · {{ row.count }}
+            {{ row.count === 1 ? 'animal' : 'animales' }} ·
+            {{ (row.count / herd().total) * 100 | number: '1.1-1' }} % del total registrado
+          </p>
+        }
+        <details class="mt-5">
+          <summary class="w-fit cursor-pointer text-xs underline underline-offset-4">
+            Ver cantidades por estado
+          </summary>
+          <table class="mt-4 w-full text-left text-xs">
+            <caption class="sr-only">
+              Estado de los animales registrados
+            </caption>
+            <thead class="border-b border-stone-200 text-stone-500 dark:border-white/10">
+              <tr>
+                <th scope="col" class="py-3 font-medium">Estado</th>
+                <th scope="col" class="py-3 text-right font-medium">Cantidad</th>
+                <th scope="col" class="py-3 text-right font-medium">% del total</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-stone-200 dark:divide-white/10">
+              @for (row of stateRows(); track row.label) {
+                <tr>
+                  <th scope="row" class="py-3 font-normal">{{ row.label }}</th>
+                  <td class="py-3 text-right">{{ row.count }}</td>
+                  <td class="py-3 text-right">
+                    {{ (row.count / herd().total) * 100 | number: '1.1-1' }} %
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </details>
+      </section>
+    </div>
+    <p class="mt-6 text-xs leading-5 text-stone-500">
+      Pasa el cursor o toca las barras para ver cantidades y porcentajes. También puedes enfocar
+      cada gráfica con Tab y usar las flechas izquierda y derecha.
+    </p>
+  }
+</section>

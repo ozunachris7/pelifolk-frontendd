@@ -1,0 +1,296 @@
+<div class="mx-auto max-w-6xl">
+  <div
+    class="flex flex-wrap items-end justify-between gap-4 border-b border-stone-200 pb-8 dark:border-white/10">
+    <div>
+      <p class="mb-3 text-xs text-stone-500">Mi rancho / Resumen</p>
+      <h1 class="text-2xl font-medium tracking-tight sm:text-3xl">Resumen del rancho</h1>
+      <p class="mt-3 text-sm text-stone-500">
+        El estado del hato y sus pendientes, con información registrada.
+      </p>
+    </div>
+    <button
+      type="button"
+      (click)="load()"
+      [disabled]="loading()"
+      class="rounded-lg border border-stone-200 px-4 py-2 text-xs disabled:opacity-50 dark:border-white/15">
+      {{ loading() ? 'Actualizando…' : 'Actualizar' }}
+    </button>
+  </div>
+  @if (error()) {
+    <p role="alert" class="py-6 text-sm text-red-600">{{ error() }}</p>
+    <button (click)="load()" class="text-sm underline">Reintentar</button>
+  }
+  @if (loading() && !data()) {
+    <p role="status" class="py-12 text-sm text-stone-500">Cargando resumen…</p>
+  }
+  @if (data(); as summary) {
+    <div class="mt-6 flex flex-wrap items-center justify-between gap-2 text-xs text-stone-500">
+      <p>Al {{ summary.as_of | date: 'dd/MM/yyyy' : 'UTC' }}</p>
+      <p>
+        Economía y alimentación · {{ summary.period_from | date: 'dd/MM/yyyy' : 'UTC' }} —
+        {{ summary.period_to | date: 'dd/MM/yyyy' : 'UTC' }}
+      </p>
+    </div>
+    <div class="grid gap-4 pt-5 sm:grid-cols-2 lg:grid-cols-3">
+      @if (summary.finance; as finance) {
+        <section
+          data-testid="finance-summary"
+          class="relative overflow-hidden rounded-xl border border-stone-200 bg-stone-50 p-6 sm:col-span-2 dark:border-white/10 dark:bg-[#191b18]">
+          <span
+            aria-hidden="true"
+            class="absolute inset-y-6 left-0 w-1 rounded-r bg-green-800 dark:bg-green-500/60"></span>
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="text-sm font-medium">Economía</h2>
+            <a
+              routerLink="/dashboard/finance"
+              aria-label="Ver economía"
+              class="rounded-md p-1 text-stone-500 hover:text-green-800 dark:hover:text-white"
+              ><lucide-icon [img]="arrowIcon" [size]="17"
+            /></a>
+          </div>
+          <p class="mt-5 text-xs text-stone-500">Balance del mes</p>
+          <p class="mt-2 break-words text-3xl font-medium tracking-tight sm:text-4xl">
+            {{ finance.balance | currency: 'MXN' : 'symbol' : '1.2-2' }}
+          </p>
+          <dl
+            class="mt-6 grid grid-cols-2 gap-4 border-t border-stone-200 pt-4 dark:border-white/10">
+            <div>
+              <dt class="text-xs text-stone-500">Ingresos</dt>
+              <dd class="mt-2 break-words text-sm font-medium">
+                {{ finance.income_total | currency: 'MXN' : 'symbol' : '1.2-2' }}
+              </dd>
+            </div>
+            <div class="border-l border-stone-200 pl-4 dark:border-white/10">
+              <dt class="text-xs text-stone-500">Gastos</dt>
+              <dd class="mt-2 break-words text-sm font-medium">
+                {{ finance.expense_total | currency: 'MXN' : 'symbol' : '1.2-2' }}
+              </dd>
+            </div>
+          </dl>
+        </section>
+      }
+      @if (summary.feeding; as feeding) {
+        <section
+          class="flex flex-col rounded-xl border border-stone-200 bg-white p-6 dark:border-white/10 dark:bg-[#171717]">
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="text-sm font-medium">Alimentación</h2>
+            <a
+              routerLink="/dashboard/feeding"
+              aria-label="Ver alimentación"
+              class="rounded-md p-1 text-stone-500 hover:text-green-800 dark:hover:text-white"
+              ><lucide-icon [img]="arrowIcon" [size]="17"
+            /></a>
+          </div>
+          <p class="mt-5 text-xs text-stone-500">Costo del mes</p>
+          <p class="mt-2 break-words text-3xl font-medium tracking-tight">
+            {{ feeding.cost | currency: 'MXN' : 'symbol' : '1.2-2' }}
+          </p>
+          <p
+            class="mt-6 border-t border-stone-200 pt-4 text-xs text-stone-500 dark:border-white/10">
+            {{ feeding.consumptions }} consumos registrados
+          </p>
+          @if (feeding.unpriced_count) {
+            <p class="mt-2 text-xs text-amber-700 dark:text-amber-300">
+              {{ feeding.unpriced_count }} sin precio: excluidos del costo.
+            </p>
+          }
+        </section>
+      }
+      @if (summary.finance) {
+        <app-finance-trend
+          [refreshToken]="chartRevision()"
+          class="block min-w-0 sm:col-span-2 lg:col-span-3" />
+      }
+      @if (summary.herd; as herd) {
+        <section
+          data-testid="herd-summary"
+          class="rounded-xl border border-stone-200 bg-white p-6 dark:border-white/10 dark:bg-[#171717]">
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="text-sm font-medium">Animales activos</h2>
+            <a
+              routerLink="/dashboard/animals"
+              aria-label="Ver animales"
+              class="rounded-md p-1 text-stone-500 hover:text-green-800 dark:hover:text-white"
+              ><lucide-icon [img]="arrowIcon" [size]="17"
+            /></a>
+          </div>
+          <p class="mt-5 text-4xl font-medium tracking-tight">{{ herd.active }}</p>
+          <p
+            class="mt-5 border-t border-stone-200 pt-4 text-xs leading-5 text-stone-500 dark:border-white/10">
+            {{ herd.female }} {{ herd.female === 1 ? 'hembra' : 'hembras' }} · {{ herd.male }}
+            {{ herd.male === 1 ? 'macho' : 'machos' }} · {{ herd.exited }}
+            {{ herd.exited === 1 ? 'baja' : 'bajas' }}
+          </p>
+        </section>
+      }
+      @if (summary.health; as health) {
+        <section
+          data-testid="health-summary"
+          class="rounded-xl border border-stone-200 bg-white p-6 dark:border-white/10 dark:bg-[#171717]">
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="text-sm font-medium">Casos sanitarios sin cerrar</h2>
+            <a
+              routerLink="/dashboard/health"
+              aria-label="Ver sanidad"
+              class="rounded-md p-1 text-stone-500 hover:text-green-800 dark:hover:text-white"
+              ><lucide-icon [img]="arrowIcon" [size]="17"
+            /></a>
+          </div>
+          <p class="mt-5 text-4xl font-medium tracking-tight">
+            {{ health.open_cases + health.treatment_cases }}
+          </p>
+          <p
+            class="mt-5 border-t border-stone-200 pt-4 text-xs leading-5 text-stone-500 dark:border-white/10">
+            {{ health.open_cases }} {{ health.open_cases === 1 ? 'abierto' : 'abiertos' }} ·
+            {{ health.treatment_cases }} en tratamiento
+          </p>
+        </section>
+      }
+      @if (summary.breeding; as breeding) {
+        <section
+          class="rounded-xl border border-stone-200 bg-white p-6 dark:border-white/10 dark:bg-[#171717]">
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="text-sm font-medium">Hembras con diagnóstico gestante</h2>
+            <a
+              routerLink="/dashboard/breeding"
+              aria-label="Ver reproducción"
+              class="rounded-md p-1 text-stone-500 hover:text-green-800 dark:hover:text-white"
+              ><lucide-icon [img]="arrowIcon" [size]="17"
+            /></a>
+          </div>
+          <p class="mt-5 text-4xl font-medium tracking-tight">
+            {{ breeding.pregnant }}
+          </p>
+          <p
+            class="mt-5 border-t border-stone-200 pt-4 text-xs leading-5 text-stone-500 dark:border-white/10">
+            Último diagnóstico vigente · {{ breeding.births }}
+            {{ breeding.births === 1 ? 'parto' : 'partos' }} este mes
+          </p>
+        </section>
+      }
+    </div>
+    @if (summary.herd; as herd) {
+      <app-herd-distribution class="mt-8 block min-w-0" [herd]="herd" [asOf]="summary.as_of" />
+    }
+    @if (summary.health; as health) {
+      <app-health-distribution
+        class="mt-8 block min-w-0"
+        [health]="health"
+        [asOf]="summary.as_of" />
+    }
+    @if (summary.health) {
+      <app-health-trend class="mt-8 block min-w-0" [refreshToken]="chartRevision()" />
+    }
+    @if (summary.breeding) {
+      <app-breeding-trend class="mt-8 block min-w-0" [refreshToken]="chartRevision()" />
+    }
+    @if (summary.feeding) {
+      <app-feeding-trend class="mt-8 block min-w-0" [refreshToken]="chartRevision()" />
+    }
+
+    @if (
+      !summary.herd && !summary.health && !summary.breeding && !summary.finance && !summary.feeding
+    ) {
+      <p class="py-8 text-sm text-stone-500">
+        Tu rol todavía no tiene acceso a las cifras del rancho.
+      </p>
+    }
+    <div class="grid gap-12 py-8 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div>
+        @if (summary.health; as health) {
+          <section class="mb-10" aria-labelledby="pending-title">
+            <div
+              class="flex flex-wrap justify-between gap-2 border-b border-stone-200 pb-4 dark:border-white/10">
+              <h2 id="pending-title" class="text-sm font-medium">Pendientes sanitarios</h2>
+              <a routerLink="/dashboard/health/programs" class="text-xs underline"
+                >{{ health.attention_count }} avisos · Ver programas</a
+              >
+            </div>
+            <ul class="divide-y divide-stone-200 dark:divide-white/10">
+              @for (pending of health.pending; track pending.program_id + pending.animal.id) {
+                <li class="flex flex-wrap justify-between gap-3 py-4">
+                  <div>
+                    <p class="text-sm">{{ pending.program_name }}</p>
+                    <p class="mt-1 text-xs text-stone-500">
+                      {{
+                        pending.animal.name ||
+                          pending.animal.siniiga ||
+                          'Sin
+                identificación'
+                      }}
+                    </p>
+                  </div>
+                  <div class="text-right">
+                    <p class="text-xs">{{ statusLabels[pending.status] }}</p>
+                    @if (pending.due_date) {
+                      <p class="mt-1 text-xs text-stone-500">
+                        {{ pending.due_date | date: 'dd/MM/yyyy' : 'UTC' }}
+                      </p>
+                    }
+                  </div>
+                </li>
+              } @empty {
+                <li class="py-6 text-sm text-stone-500">
+                  No hay avisos de programas sanitarios activos.
+                </li>
+              }
+            </ul>
+            <p class="text-xs leading-5 text-stone-500">
+              Los avisos cuentan aplicaciones por animal y programa. Incluyen fechas vencidas,
+              próximas y animales sin fecha de nacimiento.
+            </p>
+          </section>
+        }
+        <section aria-labelledby="activity-title">
+          <h2
+            id="activity-title"
+            class="border-b border-stone-200 pb-4 text-sm font-medium dark:border-white/10">
+            Últimos registros del hato
+          </h2>
+          <ul class="divide-y divide-stone-200 dark:divide-white/10">
+            @for (event of summary.activity; track event.id) {
+              <li>
+                <a
+                  [routerLink]="['/dashboard', eventPaths[event.type_id]]"
+                  class="flex items-center justify-between gap-4 py-4"
+                  ><div>
+                    <p class="text-sm">{{ eventLabels[event.type_id] }}</p>
+                    <p class="mt-1 text-xs text-stone-500">
+                      {{ event.animal_name || event.siniiga || 'Sin identificación' }}
+                    </p>
+                  </div>
+                  <time class="whitespace-nowrap text-xs text-stone-500">{{
+                    event.date | date: 'dd/MM/yyyy' : 'UTC'
+                  }}</time></a
+                >
+              </li>
+            } @empty {
+              <li class="py-8 text-sm text-stone-500">
+                Todavía no hay eventos disponibles para las áreas que puedes consultar.
+              </li>
+            }
+          </ul>
+        </section>
+      </div>
+      <section aria-labelledby="sections-title">
+        <h2
+          id="sections-title"
+          class="border-b border-stone-200 pb-4 text-sm font-medium dark:border-white/10">
+          Áreas de gestión
+        </h2>
+        <nav
+          aria-label="Accesos a las áreas del rancho"
+          class="divide-y divide-stone-200 dark:divide-white/10">
+          @for (section of sections(); track section.path) {
+            <a
+              class="flex items-center justify-between gap-4 py-4 text-sm hover:text-green-800 dark:hover:text-white"
+              [routerLink]="['/dashboard', section.path]"
+              ><span>{{ section.label }}</span
+              ><lucide-icon [img]="arrowIcon" [size]="16" aria-hidden="true"
+            /></a>
+          }
+        </nav>
+      </section>
+    </div>
+  }
+</div>

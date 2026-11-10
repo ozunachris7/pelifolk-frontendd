@@ -1,0 +1,213 @@
+<div class="mx-auto max-w-6xl">
+  <div class="flex flex-wrap items-end justify-between gap-5 pb-7">
+    <div>
+      <p class="mb-3 text-xs text-stone-500 dark:text-stone-400">Mi rancho / Hato</p>
+      <h1 class="text-2xl font-medium tracking-tight sm:text-3xl">Razas</h1>
+      <p class="mt-3 text-sm leading-6 text-stone-500 dark:text-stone-400">
+        Administra las razas que utilizas para registrar tus animales.
+      </p>
+    </div>
+    @if (canWrite()) {
+      <button
+        type="button"
+        data-testid="new-breed"
+        (click)="openForm()"
+        [disabled]="loading() || busy()"
+        class="inline-flex items-center gap-2 rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white hover:bg-green-800 disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+        <lucide-icon [img]="plusIcon" [size]="16" aria-hidden="true" /> Nueva raza
+      </button>
+    }
+  </div>
+  <nav
+    aria-label="Gestión del hato"
+    class="mb-7 flex flex-wrap gap-7 border-b border-stone-200 text-sm dark:border-white/10">
+    <a
+      routerLink="/dashboard/animals"
+      class="pb-4 text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-white"
+      >Animales</a
+    ><a
+      routerLink="/dashboard/breeds"
+      aria-current="page"
+      class="border-b-2 border-green-800 pb-4 font-medium text-green-900 dark:border-green-200 dark:text-green-200"
+      >Razas</a
+    >
+    <a routerLink="/dashboard/physical-evaluations" class="pb-4 text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-white">Evaluaciones físicas</a>
+  <a routerLink="/dashboard/management-decisions" class="pb-4 text-stone-500">Decisiones vigentes</a>
+  </nav>
+  @if (success()) {
+    <div
+      role="status"
+      class="mb-5 flex justify-between gap-4 rounded-lg bg-green-50 p-4 text-sm text-green-900 dark:bg-green-950/30 dark:text-green-200">
+      <p>{{ success() }}</p>
+      <button type="button" (click)="success.set('')" aria-label="Cerrar mensaje">×</button>
+    </div>
+  }
+  @if (!canRead()) {
+    <p class="py-10 text-sm text-stone-500">No tienes permiso para consultar razas.</p>
+  } @else {
+    <div class="mb-6 max-w-md">
+      <label for="breed-search" class="mb-2 block text-xs font-medium">Buscar raza</label
+      ><input
+        id="breed-search"
+        type="search"
+        [value]="search()"
+        (input)="search.set($any($event.target).value)"
+        placeholder="Nombre de la raza"
+        class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm outline-none focus:border-green-700 dark:border-white/15 dark:bg-[#171717]" />
+    </div>
+    @if (error()) {
+      <div
+        role="alert"
+        class="mb-5 rounded-lg bg-red-50 p-4 text-sm text-red-800 dark:bg-red-950/25 dark:text-red-200">
+        {{ error() }}
+        <button type="button" (click)="load()" class="ml-2 underline">Reintentar</button>
+      </div>
+    }
+    @if (loading()) {
+      <p role="status" class="py-12 text-center text-sm text-stone-500">Cargando razas…</p>
+    } @else if (!error()) {
+      <table class="w-full text-left text-sm">
+        <thead
+          class="border-y border-stone-200 text-xs text-stone-500 dark:border-white/10 dark:text-stone-400">
+          <tr>
+            <th scope="col" class="py-4 pr-4 font-medium">Raza</th>
+            <th scope="col" class="py-4 text-right font-medium">Acciones</th>
+          </tr>
+        </thead>
+        <tbody
+          class="divide-y divide-stone-200 border-b border-stone-200 dark:divide-white/10 dark:border-white/10">
+          @for (breed of filtered(); track breed.id) {
+            <tr
+              [attr.data-breed-id]="breed.id"
+              class="hover:bg-stone-50 dark:hover:bg-white/[0.025]">
+              <th scope="row" class="break-words py-5 pr-4 font-medium">
+                {{ breed.name }}
+              </th>
+              <td class="py-5 text-right">
+                @if (canWrite()) {
+                  <div class="flex flex-wrap justify-end gap-4">
+                    <button
+                      type="button"
+                      (click)="openForm(breed)"
+                      [disabled]="busy()"
+                      [attr.aria-label]="'Editar raza ' + breed.name"
+                      class="inline-flex items-center gap-1.5 text-xs text-green-800 hover:underline dark:text-green-200">
+                      <lucide-icon [img]="editIcon" [size]="14" aria-hidden="true" />
+                      Editar</button
+                    ><button
+                      type="button"
+                      (click)="askDelete(breed)"
+                      [disabled]="busy()"
+                      [attr.aria-label]="'Eliminar raza ' + breed.name"
+                      class="inline-flex items-center gap-1.5 text-xs text-red-700 hover:underline dark:text-red-300">
+                      <lucide-icon [img]="deleteIcon" [size]="14" aria-hidden="true" />
+                      Eliminar
+                    </button>
+                  </div>
+                } @else {
+                  <span class="text-xs text-stone-400">Solo consulta</span>
+                }
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="2" class="py-14 text-center text-sm text-stone-500">
+                {{
+                  search().trim()
+                    ? 'No hay razas con ese nombre.'
+                    : 'Todavía no hay
+          razas registradas.'
+                }}
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+      <p class="mt-5 text-xs text-stone-500">{{ filtered().length }} razas</p>
+    }
+  }
+</div>
+@if (formOpen()) {
+  <app-modal
+    [title]="editing() ? 'Editar raza' : 'Nueva raza'"
+    [busy]="busy()"
+    (dismiss)="closeForm()"
+    ><form [formGroup]="form" (ngSubmit)="save()" novalidate data-testid="breed-form">
+      <fieldset [disabled]="busy()" class="min-w-0">
+        <label for="breed-name" class="mb-2 block text-xs font-medium">Nombre de la raza</label
+        ><input
+          id="breed-name"
+          formControlName="name"
+          maxlength="80"
+          autofocus
+          autocomplete="off"
+          [attr.aria-invalid]="form.controls.name.touched && form.controls.name.invalid"
+          class="w-full rounded-lg border border-stone-300 bg-white px-3 py-3 text-sm outline-none focus:border-green-700 dark:border-white/15 dark:bg-[#202020]" />
+        @if (form.controls.name.touched && form.controls.name.invalid) {
+          <p class="mt-2 text-xs text-red-700 dark:text-red-300">
+            Ingresa un nombre de 1 a 80 caracteres.
+          </p>
+        }
+        @if (editing()) {
+          <p class="mt-3 text-xs leading-6 text-stone-500">
+            El nuevo nombre se aplicará a todos los animales que tengan esta raza. Sus porcentajes
+            se conservan.
+          </p>
+        }
+      </fieldset>
+      @if (formError()) {
+        <p
+          role="alert"
+          class="mt-5 rounded-lg bg-red-50 p-3 text-xs leading-6 text-red-700 dark:bg-red-950/30 dark:text-red-200">
+          {{ formError() }}
+        </p>
+      }
+      <div class="mt-7 flex justify-end gap-3 border-t border-stone-200 pt-5 dark:border-white/10">
+        <button
+          type="button"
+          (click)="closeForm()"
+          [disabled]="busy()"
+          class="rounded-lg border border-stone-200 px-4 py-3 text-xs dark:border-white/15">
+          Cancelar</button
+        ><button
+          type="submit"
+          [disabled]="busy()"
+          class="rounded-lg bg-green-900 px-5 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+          {{ busy() ? 'Guardando…' : editing() ? 'Guardar cambios' : 'Crear raza' }}
+        </button>
+      </div>
+    </form></app-modal
+  >
+}
+@if (deleting(); as breed) {
+  <app-modal title="Eliminar raza" [busy]="busy()" (dismiss)="cancelDelete()"
+    ><p class="text-sm leading-7">
+      Se eliminará la raza <strong class="font-medium">{{ breed.name }}</strong
+      >.
+    </p>
+    <p class="mt-3 text-xs leading-6 text-stone-500">
+      Si está asignada a animales, primero debes cambiar sus razas.
+    </p>
+    @if (formError()) {
+      <p role="alert" class="mt-4 text-sm text-red-700 dark:text-red-300">
+        {{ formError() }}
+      </p>
+    }
+    <div class="mt-7 flex justify-end gap-3">
+      <button
+        type="button"
+        (click)="cancelDelete()"
+        [disabled]="busy()"
+        class="rounded-lg border border-stone-200 px-4 py-3 text-xs dark:border-white/15">
+        Cancelar</button
+      ><button
+        type="button"
+        data-testid="confirm-delete-breed"
+        (click)="confirmDelete()"
+        [disabled]="busy()"
+        class="rounded-lg bg-red-700 px-4 py-3 text-xs font-medium text-white disabled:opacity-50">
+        {{ busy() ? 'Eliminando…' : 'Eliminar raza' }}
+      </button>
+    </div></app-modal
+  >
+}

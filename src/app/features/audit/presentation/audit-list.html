@@ -1,0 +1,301 @@
+<header class="mb-7 flex items-start gap-4">
+  <lucide-icon [img]="icons.journal" [size]="25" aria-hidden="true" class="mt-1 text-stone-500" />
+  <div class="min-w-0">
+    <p class="text-xs uppercase tracking-widest text-stone-500">Historial del rancho</p>
+    <h1 class="mt-2 text-2xl font-semibold">Auditoría</h1>
+    <p class="mt-2 max-w-2xl text-sm text-stone-500">
+      Revisa quién registró cada cambio y qué valores modificó.
+    </p>
+  </div>
+</header>
+@if (!canRead()) {
+  <p role="alert">No tienes permiso para consultar la auditoría.</p>
+} @else {
+  <form
+    [formGroup]="filters"
+    (ngSubmit)="load()"
+    class="mb-6 min-w-0 space-y-4 rounded-lg border border-stone-200 p-4 dark:border-white/10 sm:p-5">
+    <div class="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div class="min-w-0">
+        <label for="audit-q" class="mb-2 block text-xs">Buscar registro o usuario</label
+        ><input
+          id="audit-q"
+          formControlName="q"
+          maxlength="100"
+          placeholder="Nombre, correo o identificador"
+          class="w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm dark:border-white/15 dark:bg-[#171717]" />
+      </div>
+      <div class="min-w-0">
+        <label for="audit-module" class="mb-2 block text-xs">Módulo</label
+        ><select
+          id="audit-module"
+          formControlName="module"
+          class="w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm dark:border-white/15 dark:bg-[#171717]">
+          <option value="">Todos los módulos</option>
+          @for (m of modules; track m[0]) {
+            <option [value]="m[0]">{{ m[1] }}</option>
+          }
+        </select>
+      </div>
+      <div class="min-w-0">
+        <label for="audit-action" class="mb-2 block text-xs">Acción</label
+        ><select
+          id="audit-action"
+          formControlName="action"
+          class="w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm dark:border-white/15 dark:bg-[#171717]">
+          <option value="">Todas las acciones</option>
+          <option value="INSERT">Creación</option>
+          <option value="UPDATE">Modificación</option>
+          <option value="DELETE">Eliminación</option>
+        </select>
+      </div>
+      <div class="min-w-0">
+        <label for="audit-user" class="mb-2 block text-xs">Realizado por</label
+        ><select
+          id="audit-user"
+          formControlName="user_id"
+          class="w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm dark:border-white/15 dark:bg-[#171717]">
+          <option value="">Todos los usuarios</option>
+          <option value="system">Sistema / sin usuario registrado</option>
+          @for (a of actors(); track a.id) {
+            <option [value]="a.id">{{ a.name }}{{ a.active ? '' : ' · Inactivo' }}</option>
+          }
+        </select>
+      </div>
+      <div class="min-w-0">
+        <label for="audit-from" class="mb-2 block text-xs">Desde</label
+        ><input
+          id="audit-from"
+          type="date"
+          formControlName="date_from"
+          class="w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm dark:border-white/15 dark:bg-[#171717]" />
+      </div>
+      <div class="min-w-0">
+        <label for="audit-to" class="mb-2 block text-xs">Hasta</label
+        ><input
+          id="audit-to"
+          type="date"
+          formControlName="date_to"
+          class="w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm dark:border-white/15 dark:bg-[#171717]" />
+      </div>
+    </div>
+    <div
+      class="flex flex-wrap items-center gap-3 border-t border-stone-200 pt-4 dark:border-white/10">
+      <button
+        type="submit"
+        class="flex items-center gap-2 rounded-lg bg-green-900 px-4 py-2.5 text-sm text-white">
+        <lucide-icon [img]="icons.search" [size]="15" aria-hidden="true" />Filtrar
+      </button>
+      <button type="button" (click)="reset()" class="px-3 py-2.5 text-sm">Limpiar filtros</button>
+      <details class="ml-auto text-xs">
+        <summary class="cursor-pointer py-2 text-stone-500">
+          Buscar otro usuario del historial
+        </summary>
+        <div class="mt-2 flex flex-wrap gap-2">
+          <input
+            aria-label="Buscar usuario del historial"
+            [formControl]="actorSearch"
+            maxlength="100"
+            placeholder="Nombre o correo"
+            class="min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-2 dark:border-white/15" /><button
+            type="button"
+            (click)="loadActors()"
+            [disabled]="actorsLoading()"
+            class="rounded-lg border border-stone-200 px-3 py-2 dark:border-white/15">
+            {{ actorsLoading() ? 'Buscando…' : 'Buscar usuario' }}
+          </button>
+        </div>
+        <p class="mt-2 text-stone-500">Se muestran hasta 50 usuarios con cambios registrados.</p>
+      </details>
+    </div>
+    @if (actorsError()) {
+      <p role="alert" class="text-sm text-red-600">{{ actorsError() }}</p>
+    }
+  </form>
+  @if (recordFilter()) {
+    <div class="mb-4 flex flex-wrap items-center gap-3 text-sm">
+      <span>Historial de: {{ recordFilter() }}</span
+      ><button type="button" (click)="reset()" aria-label="Quitar filtro de registro" class="p-1">
+        <lucide-icon [img]="icons.clear" [size]="16" aria-hidden="true" />
+      </button>
+    </div>
+  }
+  @if (error()) {
+    <p role="alert" class="mb-4 text-sm text-red-600">{{ error() }}</p>
+  }
+  @if (loading()) {
+    <p aria-live="polite" class="py-8 text-sm text-stone-500">Cargando cambios…</p>
+  } @else {
+    <div class="min-w-0 overflow-x-auto rounded-lg border border-stone-200 dark:border-white/10">
+      <table class="w-full text-left text-sm">
+        <thead class="bg-stone-50 text-xs text-stone-500 dark:bg-[#1c1b19]">
+          <tr>
+            <th scope="col" class="p-4">Fecha y hora</th>
+            <th scope="col" class="p-4">Usuario</th>
+            <th scope="col" class="p-4">Registro</th>
+            <th scope="col" class="p-4">Acción</th>
+            <th scope="col" class="p-4">Detalle</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of page().items; track row.id) {
+            <tr data-audit-row class="border-t border-stone-200 align-top dark:border-white/10">
+              <td class="whitespace-nowrap p-4">
+                {{ row.date | date: 'dd/MM/yyyy'
+                }}<span class="mt-1 block text-xs text-stone-500">{{
+                  row.date | date: 'HH:mm:ss'
+                }}</span>
+              </td>
+              <td class="p-4">
+                <span class="font-medium">{{
+                  row.actor?.name || 'Sistema / sin usuario registrado'
+                }}</span>
+                @if (row.actor) {
+                  <span class="mt-1 block break-all text-xs text-stone-500">{{
+                    row.actor.email
+                  }}</span>
+                }
+              </td>
+              <td class="p-4">
+                <span class="font-medium"
+                  >{{ entityLabel(row) }}
+                  @if (row.record_name) {
+                    · {{ row.record_name }}
+                  }</span
+                ><span class="mt-1 block text-xs text-stone-500">{{
+                  moduleLabel(row.module)
+                }}</span>
+              </td>
+              <td class="p-4">
+                <span class="inline-flex items-center gap-2 whitespace-nowrap"
+                  ><span
+                    class="h-1.5 w-1.5 rounded-full bg-stone-400"
+                    [class.bg-green-700]="row.action === 'INSERT'"
+                    [class.bg-amber-600]="row.action === 'UPDATE'"
+                    [class.bg-red-600]="row.action === 'DELETE'"></span
+                  >{{ actionLabel(row.action) }}</span
+                >
+              </td>
+              <td class="p-4">
+                <button
+                  type="button"
+                  (click)="show(row.id)"
+                  [attr.aria-label]="
+                    'Ver cambio de ' +
+                    entityLabel(row) +
+                    (row.record_name ? ' ' + row.record_name : '')
+                  "
+                  class="flex items-center gap-2 whitespace-nowrap underline underline-offset-4">
+                  <lucide-icon [img]="icons.view" [size]="16" aria-hidden="true" />Ver cambio
+                </button>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="5" class="px-4 py-10 text-center text-stone-500">
+                No hay cambios registrados con estos filtros.
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <div class="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
+      <p>
+        {{ page().total }} registros
+        @if (page().total) {
+          · {{ page().offset + 1 }}–{{ page().offset + page().items.length }}
+        }
+      </p>
+      <div class="flex gap-4">
+        <button
+          type="button"
+          (click)="load(page().offset - 25)"
+          [disabled]="page().offset === 0"
+          class="disabled:opacity-40">
+          Anterior</button
+        ><button
+          type="button"
+          (click)="load(page().offset + 25)"
+          [disabled]="page().offset + 25 >= page().total"
+          class="disabled:opacity-40">
+          Siguiente
+        </button>
+      </div>
+    </div>
+  }
+  <p class="mt-6 text-xs text-stone-500">
+    Fechas y horas en tu horario local. Se muestran los cambios que la aplicación guardó; las
+    modificaciones hechas directamente en la base de datos no se registran aquí.
+  </p>
+}
+@if (open()) {
+  <app-modal title="Detalle del cambio" (dismiss)="close()">
+    @if (detailLoading()) {
+      <p aria-live="polite" class="py-6 text-sm text-stone-500">Cargando detalle…</p>
+    }
+    @if (detailError()) {
+      <p role="alert" class="text-sm text-red-600">{{ detailError() }}</p>
+    }
+    @if (detail(); as d) {
+      <div class="mb-5 min-w-0 border-b border-stone-200 pb-5 dark:border-white/10">
+        <p class="text-xs uppercase tracking-widest text-stone-500">
+          {{ moduleLabel(d.module) }} · {{ actionLabel(d.action) }}
+        </p>
+        <h2 class="mt-2 break-words text-lg font-medium">
+          {{ entityLabel(d) }}
+          @if (d.record_name) {
+            · {{ d.record_name }}
+          }
+        </h2>
+        <p class="mt-2 text-sm">{{ d.actor?.name || 'Sistema / sin usuario registrado' }}</p>
+        <p class="mt-1 text-xs text-stone-500">{{ d.date | date: 'dd/MM/yyyy · HH:mm:ss' }}</p>
+        <p class="mt-3 break-all text-xs text-stone-500">
+          Identificador del registro: {{ d.record_id }}
+        </p>
+      </div>
+      @for (change of d.changes; track change.field) {
+        <section
+          data-audit-change
+          class="min-w-0 border-b border-stone-200 py-4 first:pt-0 dark:border-white/10">
+          <h3 class="mb-3 break-words text-sm font-medium">{{ fieldLabel(change.field) }}</h3>
+          <div class="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+            <div class="min-w-0">
+              <p class="mb-2 text-xs text-stone-500">Antes</p>
+              <p class="whitespace-pre-line break-all text-sm">
+                {{ changeValue(change, 'before') }}
+              </p>
+            </div>
+            <div class="min-w-0 border-l-2 border-green-800 pl-3">
+              <p class="mb-2 text-xs text-stone-500">Después</p>
+              <p class="whitespace-pre-line break-all text-sm">
+                {{ changeValue(change, 'after') }}
+              </p>
+            </div>
+          </div>
+        </section>
+      } @empty {
+        <p class="py-5 text-sm text-stone-500">
+          No hay diferencias de campos guardadas para este registro.
+        </p>
+      }
+      <p class="mt-5 text-xs text-stone-500">
+        Los nombres de usuarios y referencias vinculadas se muestran como están registrados
+        actualmente.
+      </p>
+      <div class="mt-5 flex flex-wrap justify-end gap-3">
+        <button
+          type="button"
+          (click)="recordHistory(d)"
+          class="rounded-lg border border-stone-200 px-4 py-3 text-xs dark:border-white/15">
+          Ver historial de este registro</button
+        ><button
+          type="button"
+          (click)="close()"
+          class="rounded-lg bg-green-900 px-4 py-3 text-xs text-white">
+          Cerrar
+        </button>
+      </div>
+    }
+  </app-modal>
+}

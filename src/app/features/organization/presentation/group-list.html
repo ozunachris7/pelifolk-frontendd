@@ -1,0 +1,192 @@
+<div class="mx-auto max-w-6xl">
+  <div class="flex flex-wrap items-end justify-between gap-5 pb-7">
+    <div>
+      <p class="mb-3 text-xs text-stone-500 dark:text-stone-400">Mi rancho / Organización</p>
+      <h1 class="text-2xl font-medium tracking-tight sm:text-3xl">Lotes</h1>
+      <p class="mt-3 text-sm leading-6 text-stone-500 dark:text-stone-400">
+        Agrupa animales y conserva sus fechas de ingreso y salida.
+      </p>
+    </div>
+    @if (canWrite()) {
+      <button
+        type="button"
+        data-testid="new-group"
+        (click)="openForm()"
+        [disabled]="loading() || busy()"
+        class="inline-flex items-center gap-2 rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+        <lucide-icon [img]="plusIcon" [size]="16" aria-hidden="true" /> Nuevo lote
+      </button>
+    }
+  </div>
+  <app-organization-nav />
+  @if (success()) {
+    <div
+      role="status"
+      class="mb-5 flex justify-between gap-4 rounded-lg bg-green-50 p-4 text-sm text-green-900 dark:bg-green-950/30 dark:text-green-200">
+      <p>{{ success() }}</p>
+      <button type="button" (click)="success.set('')" aria-label="Cerrar mensaje">×</button>
+    </div>
+  }
+  @if (!canRead()) {
+    <p class="py-10 text-sm text-stone-500">No tienes permiso para consultar lotes.</p>
+  } @else {
+    <div class="mb-6 flex flex-wrap gap-3">
+      <div class="min-w-0 max-w-md flex-1 basis-52">
+        <label for="group-search" class="mb-2 block text-xs font-medium">Buscar lote</label
+        ><input
+          id="group-search"
+          type="search"
+          [value]="search()"
+          (input)="search.set($any($event.target).value)"
+          placeholder="Nombre"
+          class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]" />
+      </div>
+      <div>
+        <label for="group-status" class="mb-2 block text-xs font-medium">Estado</label
+        ><select
+          id="group-status"
+          [value]="status()"
+          (change)="status.set($any($event.target).value)"
+          class="rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+          <option value="active">Activos</option>
+          <option value="inactive">Inactivos</option>
+          <option value="all">Todos</option>
+        </select>
+      </div>
+    </div>
+    @if (error()) {
+      <div
+        role="alert"
+        class="mb-5 rounded-lg bg-red-50 p-4 text-sm text-red-800 dark:bg-red-950/25 dark:text-red-200">
+        {{ error() }}
+        <button type="button" (click)="load()" class="ml-2 underline">Reintentar</button>
+      </div>
+    }
+    @if (loading()) {
+      <p role="status" class="py-12 text-center text-sm text-stone-500">Cargando lotes…</p>
+    } @else if (!error()) {
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[580px] text-left text-sm">
+          <thead
+            class="border-y border-stone-200 text-xs text-stone-500 dark:border-white/10 dark:text-stone-400">
+            <tr>
+              <th scope="col" class="py-4 pr-5 font-medium">Lote</th>
+              <th scope="col" class="px-4 py-4 font-medium">Animales actuales</th>
+              <th scope="col" class="px-4 py-4 font-medium">Estado</th>
+              <th scope="col" class="py-4 pl-4 text-right font-medium">Acciones</th>
+            </tr>
+          </thead>
+          <tbody
+            class="divide-y divide-stone-200 border-b border-stone-200 dark:divide-white/10 dark:border-white/10">
+            @for (item of filtered(); track item.id) {
+              <tr
+                [attr.data-group-id]="item.id"
+                class="hover:bg-stone-50 dark:hover:bg-white/[0.025]">
+                <th scope="row" class="py-5 pr-5 align-top font-normal">
+                  <span class="font-medium">{{ item.name }}</span>
+                  @if (item.description) {
+                    <span class="mt-2 block max-w-md text-xs leading-5 text-stone-500">{{
+                      item.description
+                    }}</span>
+                  }
+                </th>
+                <td class="px-4 py-5 align-top text-xs">{{ item.member_count }}</td>
+                <td class="px-4 py-5 align-top text-xs text-stone-500">
+                  {{ item.active ? 'Activo' : 'Inactivo' }}
+                </td>
+                <td class="py-5 pl-4 align-top">
+                  <div class="flex justify-end gap-4">
+                    <a
+                      [routerLink]="['/dashboard/groups', item.id]"
+                      class="inline-flex items-center gap-1.5 text-xs text-stone-600 hover:underline dark:text-stone-300"
+                      ><lucide-icon [img]="animalsIcon" [size]="15" aria-hidden="true" />
+                      Animales</a
+                    >
+                    @if (canWrite()) {
+                      <button
+                        type="button"
+                        (click)="openForm(item)"
+                        [attr.aria-label]="'Editar lote ' + item.name"
+                        class="inline-flex items-center gap-1.5 text-xs text-green-800 hover:underline dark:text-green-200">
+                        <lucide-icon [img]="editIcon" [size]="15" aria-hidden="true" /> Editar
+                      </button>
+                    }
+                  </div>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="4" class="py-14 text-center text-sm text-stone-500">
+                  No hay lotes con estos filtros.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <p class="mt-5 text-xs text-stone-500">{{ filtered().length }} lotes</p>
+    }
+  }
+</div>
+@if (formOpen()) {
+  <app-modal
+    [title]="editing() ? 'Editar lote' : 'Nuevo lote'"
+    [busy]="busy()"
+    (dismiss)="closeForm()"
+    ><form [formGroup]="form" (ngSubmit)="save()" data-testid="group-form" novalidate>
+      <fieldset [disabled]="busy()" class="min-w-0 space-y-5">
+        <div>
+          <label for="group-name" class="mb-2 block text-xs font-medium">Nombre *</label
+          ><input
+            id="group-name"
+            formControlName="name"
+            maxlength="120"
+            autofocus
+            class="w-full rounded-lg border border-stone-300 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#202020]" />
+          @if (form.controls.name.touched && form.controls.name.invalid) {
+            <p class="mt-2 text-xs text-red-700 dark:text-red-300">
+              Ingresa un nombre de 1 a 120 caracteres.
+            </p>
+          }
+        </div>
+        <div>
+          <label for="group-description" class="mb-2 block text-xs font-medium">Descripción</label
+          ><textarea
+            id="group-description"
+            formControlName="description"
+            maxlength="2000"
+            rows="3"
+            class="w-full resize-y rounded-lg border border-stone-300 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#202020]"></textarea>
+        </div>
+        <label class="inline-flex items-center gap-3 text-sm"
+          ><input type="checkbox" formControlName="active" class="size-4 accent-green-800" /> Lote
+          activo</label
+        >
+        <p class="text-xs leading-6 text-stone-500">
+          Para desactivar un lote, primero mueve o retira sus animales. Su historial se conserva.
+        </p>
+      </fieldset>
+      @if (formError()) {
+        <p
+          role="alert"
+          class="mt-5 rounded-lg bg-red-50 p-3 text-xs leading-6 text-red-700 dark:bg-red-950/30 dark:text-red-200">
+          {{ formError() }}
+        </p>
+      }
+      <div class="mt-7 flex justify-end gap-3 border-t border-stone-200 pt-5 dark:border-white/10">
+        <button
+          type="button"
+          (click)="closeForm()"
+          [disabled]="busy()"
+          class="rounded-lg border border-stone-200 px-4 py-3 text-xs dark:border-white/15">
+          Cancelar</button
+        ><button
+          type="submit"
+          [disabled]="busy()"
+          class="rounded-lg bg-green-900 px-5 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+          {{ busy() ? 'Guardando…' : editing() ? 'Guardar cambios' : 'Crear lote' }}
+        </button>
+      </div>
+    </form></app-modal
+  >
+}

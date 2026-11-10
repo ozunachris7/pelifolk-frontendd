@@ -1,0 +1,203 @@
+@if (canRead()) {
+  <section
+    aria-labelledby="animal-weight-title"
+    class="mt-7 min-w-0 border-t border-stone-200 pt-6 dark:border-white/10">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h3 id="animal-weight-title" class="text-base font-medium">Evolución del peso</h3>
+        <p class="mt-2 text-xs leading-5 text-stone-500">
+          Pesajes registrados y pesos de destete, en kilogramos.
+        </p>
+      </div>
+      <div class="flex flex-wrap gap-3">
+        <a
+          routerLink="/dashboard/management"
+          class="rounded-lg border border-stone-200 px-3 py-2 text-xs dark:border-white/15"
+          >Ir a Pesajes</a
+        >
+        <button
+          type="button"
+          (click)="retry.update(increment)"
+          [disabled]="loading()"
+          class="rounded-lg border border-stone-200 px-3 py-2 text-xs disabled:opacity-50 dark:border-white/15">
+          {{ loading() ? 'Actualizando…' : 'Actualizar' }}
+        </button>
+      </div>
+    </div>
+    @if (loading()) {
+      <p role="status" class="py-8 text-sm text-stone-500">Cargando pesajes del animal…</p>
+    }
+    @if (error()) {
+      <p role="alert" class="mt-5 text-sm text-red-700 dark:text-red-300">
+        {{ error() }}
+        <button
+          type="button"
+          (click)="retry.update(increment)"
+          class="underline underline-offset-4">
+          Reintentar
+        </button>
+      </p>
+    }
+    @if (history(); as history) {
+      @if (!history.items.length) {
+        <p role="status" class="py-8 text-sm text-stone-500">
+          Este animal todavía no tiene pesajes registrados. Los pesajes se capturan en Operación →
+          Pesajes.
+        </p>
+      } @else {
+        <form
+          (submit)="$event.preventDefault(); apply()"
+          class="mt-5 grid grid-cols-2 items-end gap-3 sm:flex sm:flex-wrap">
+          <div class="min-w-0">
+            <label for="animal-weight-from" class="mb-2 block text-xs">Desde</label
+            ><input
+              id="animal-weight-from"
+              type="date"
+              [value]="from()"
+              (input)="from.set($any($event.target).value)"
+              class="w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm dark:border-white/15 dark:bg-[#171717]" />
+          </div>
+          <div class="min-w-0">
+            <label for="animal-weight-to" class="mb-2 block text-xs">Hasta</label
+            ><input
+              id="animal-weight-to"
+              type="date"
+              [value]="to()"
+              [min]="from()"
+              (input)="to.set($any($event.target).value)"
+              class="w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm dark:border-white/15 dark:bg-[#171717]" />
+          </div>
+          <button
+            type="submit"
+            class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white dark:bg-stone-100 dark:text-stone-950">
+            Aplicar fechas
+          </button>
+          <button
+            type="button"
+            (click)="clear()"
+            class="rounded-lg border border-stone-200 px-4 py-3 text-xs dark:border-white/15">
+            Ver todo
+          </button>
+        </form>
+        @if (filterError()) {
+          <p role="alert" class="mt-3 text-sm text-red-700 dark:text-red-300">
+            {{ filterError() }}
+          </p>
+        }
+        <p class="mt-4 text-xs text-stone-500">
+          {{ rows().length }} de {{ history.items.length }} pesajes ·
+          {{
+            applied().from ? (applied().from | date: 'dd/MM/yyyy' : 'UTC') : 'Inicio del historial'
+          }}
+          — {{ applied().to ? (applied().to | date: 'dd/MM/yyyy' : 'UTC') : 'Último registro' }}
+        </p>
+        @if (rows().length) {
+          @if (rows().length === 1) {
+            <p role="status" class="mt-4 text-xs text-stone-500">
+              Hay un solo pesaje en este periodo. Se necesitan al menos dos para comparar su
+              evolución.
+            </p>
+          }
+          <p class="mt-4 text-xs leading-5 text-stone-500">
+            Pasa el cursor o toca un punto para ver el peso. Usa las flechas del teclado para
+            seleccionar. La escala vertical se ajusta a los registros.
+          </p>
+          <app-chart
+            class="mt-4 block min-w-0"
+            [model]="graph()"
+            label="Evolución del peso en kilogramos"
+            [selectedIndex]="selectedIndex()"
+            (selectIndex)="selectWeight($event)" />
+          @if (selected(); as weight) {
+            <div
+              aria-live="polite"
+              role="status"
+              class="mt-4 border-l-2 border-teal-700 py-3 pl-4 dark:border-teal-400">
+              <div class="flex flex-wrap items-baseline gap-x-5 gap-y-2">
+                <p class="text-lg font-medium">{{ weight.weight_kg | number: '1.2-2' }} kg</p>
+                <p class="text-sm">
+                  {{ weight.date | date: 'dd/MM/yyyy' : 'UTC'
+                  }}{{ weight.is_weaning ? ' · Pesaje de destete' : '' }}
+                </p>
+              </div>
+              @if (weight.gain !== null) {
+                <p class="mt-2 text-xs leading-5">
+                  Cambio respecto al pesaje anterior: {{ weight.gain | number: '1.2-2' }} kg{{
+                    weight.gain < 0 ? ' · Pérdida de peso registrada' : ''
+                  }}.
+                  @if (weight.daily !== null) {
+                    Promedio: {{ weight.daily | number: '1.3-3' }} kg/día en {{ weight.days }} días.
+                  } @else {
+                    Sin intervalo de días comparable.
+                  }
+                </p>
+                <p class="mt-1 text-xs leading-5 text-stone-500">
+                  La comparación usa el pesaje anterior registrado, incluso si está fuera de las
+                  fechas seleccionadas.
+                </p>
+              } @else {
+                <p class="mt-2 text-xs text-stone-500">
+                  Primer pesaje registrado; sin una medición anterior para comparar.
+                </p>
+              }
+              <p class="mt-2 text-xs text-stone-500">Registrado por {{ weight.recorded_by }}</p>
+              @if (weight.notes) {
+                <p class="mt-2 whitespace-pre-wrap break-words text-xs leading-5">
+                  {{ weight.notes }}
+                </p>
+              }
+            </div>
+          }
+          <details class="mt-5">
+            <summary class="w-fit cursor-pointer text-xs underline underline-offset-4">
+              Ver mediciones del periodo
+            </summary>
+            <div class="mt-4 max-w-full overflow-x-auto">
+              <table class="w-full text-left text-xs">
+                <caption class="sr-only">
+                  Pesajes del animal y comparación con su medición anterior
+                </caption>
+                <thead class="border-b border-stone-200 text-stone-500 dark:border-white/10">
+                  <tr>
+                    <th scope="col" class="px-3 py-3 font-medium">Fecha</th>
+                    <th scope="col" class="px-3 py-3 text-right font-medium">Peso</th>
+                    <th scope="col" class="px-3 py-3 text-right font-medium">Cambio</th>
+                    <th scope="col" class="px-3 py-3 font-medium">Registro</th>
+                    <th scope="col" class="px-3 py-3 font-medium">Registró</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-stone-200 dark:divide-white/10">
+                  @for (weight of rows(); track weight.id) {
+                    <tr>
+                      <th scope="row" class="whitespace-nowrap px-3 py-3 font-normal">
+                        {{ weight.date | date: 'dd/MM/yyyy' : 'UTC' }}
+                      </th>
+                      <td class="whitespace-nowrap px-3 py-3 text-right">
+                        {{ weight.weight_kg | number: '1.2-2' }} kg
+                      </td>
+                      <td class="whitespace-nowrap px-3 py-3 text-right">
+                        {{
+                          weight.gain === null
+                            ? 'Sin anterior'
+                            : (weight.gain | number: '1.2-2') + ' kg'
+                        }}
+                      </td>
+                      <td class="whitespace-nowrap px-3 py-3">
+                        {{ weight.is_weaning ? 'Destete' : 'Pesaje' }}
+                      </td>
+                      <td class="px-3 py-3">{{ weight.recorded_by }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </details>
+        } @else {
+          <p role="status" class="py-8 text-sm text-stone-500">
+            No hay pesajes en estas fechas. Cambia el periodo o pulsa Ver todo.
+          </p>
+        }
+      }
+    }
+  </section>
+}

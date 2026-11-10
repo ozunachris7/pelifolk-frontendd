@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="es" class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <title>Pelifolk</title>
+    <base href="/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script>
+      try {
+        const theme = localStorage.getItem('pelifolk-theme');
+        document.documentElement.classList.toggle('dark', theme !== 'light');
+      } catch {}
+    </script>
+    <link rel="icon" type="image/png" href="assets/logo.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap"
+      rel="stylesheet" />
+  </head>
+  <body
+    class="bg-stone-50 font-sans text-green-950 antialiased scheme-light dark:bg-[#101010] dark:text-stone-100 dark:scheme-dark">
+    <app-root></app-root>
+  </body>
+</html>

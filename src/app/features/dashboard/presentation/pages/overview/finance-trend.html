@@ -1,0 +1,184 @@
+@if (allowed()) {
+  <section
+    aria-labelledby="finance-trend-title"
+    class="min-w-0 border-y border-stone-200 py-7 dark:border-white/10">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <h2 id="finance-trend-title" class="text-base font-medium">Ingresos y gastos por mes</h2>
+        <p class="mt-2 max-w-2xl text-xs leading-5 text-stone-500">
+          Movimientos registrados en MXN. Los consumos calculados de alimento y medicamentos se
+          consultan por separado.
+        </p>
+      </div>
+      <div class="flex flex-wrap gap-2" aria-label="Periodos rápidos de la gráfica">
+        @for (months of [3, 6, 12]; track months) {
+          <button
+            type="button"
+            (click)="preset(months)"
+            [disabled]="loading()"
+            class="rounded-lg border border-stone-200 px-3 py-2 text-xs hover:bg-stone-100 disabled:opacity-50 dark:border-white/15 dark:hover:bg-white/5">
+            {{ months }} meses
+          </button>
+        }
+      </div>
+    </div>
+    <form
+      (submit)="$event.preventDefault(); load()"
+      class="mt-5 grid grid-cols-2 items-end gap-3 sm:flex sm:flex-wrap">
+      <div class="min-w-0">
+        <label for="trend-from" class="mb-2 block text-xs">Desde</label
+        ><input
+          id="trend-from"
+          type="date"
+          [value]="from()"
+          [max]="today"
+          (input)="from.set($any($event.target).value)"
+          required
+          class="w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm dark:border-white/15 dark:bg-[#171717]" />
+      </div>
+      <div class="min-w-0">
+        <label for="trend-to" class="mb-2 block text-xs">Hasta</label
+        ><input
+          id="trend-to"
+          type="date"
+          [value]="to()"
+          [min]="from()"
+          [max]="today"
+          (input)="to.set($any($event.target).value)"
+          required
+          class="w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm dark:border-white/15 dark:bg-[#171717]" />
+      </div>
+      <button
+        type="submit"
+        [disabled]="loading()"
+        class="col-span-2 rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 sm:col-auto dark:bg-stone-100 dark:text-stone-950">
+        {{ loading() ? 'Consultando…' : 'Ver gráfica' }}
+      </button>
+      <p class="col-span-2 text-xs text-stone-500 sm:pb-3">
+        Máximo 24 meses. Los meses de los extremos pueden ser parciales.
+      </p>
+    </form>
+    @if (loading()) {
+      <p role="status" class="py-12 text-sm text-stone-500">Cargando movimientos del periodo…</p>
+    }
+    @if (error()) {
+      <p role="alert" class="mt-5 text-sm text-red-700 dark:text-red-300">
+        {{ error() }}
+        <button type="button" (click)="load()" class="underline underline-offset-4">
+          Reintentar
+        </button>
+      </p>
+    }
+    @if (data(); as trend) {
+      <div class="mt-6 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <p class="text-stone-500">
+          {{ trend.date_from | date: 'dd/MM/yyyy' : 'UTC' }} —
+          {{ trend.date_to | date: 'dd/MM/yyyy' : 'UTC' }}
+        </p>
+        <div class="flex gap-5" aria-label="Leyenda">
+          <span class="inline-flex items-center gap-2"
+            ><span
+              class="h-2.5 w-2.5 rounded-sm bg-green-800 dark:bg-green-500"
+              aria-hidden="true"></span
+            >Ingresos</span
+          >
+          <span class="inline-flex items-center gap-2"
+            ><span
+              class="h-2.5 w-2.5 rounded-sm bg-amber-700 dark:bg-amber-500"
+              aria-hidden="true"></span
+            >Gastos</span
+          >
+        </div>
+      </div>
+      @if (trend.movement_count === 0) {
+        <p
+          role="status"
+          class="my-5 border-l-2 border-stone-300 py-6 pl-4 text-sm text-stone-500 dark:border-white/15">
+          No hay ingresos ni gastos registrados en este periodo. Cambia las fechas o registra un
+          movimiento en Economía.
+        </p>
+      } @else {
+        <p class="mt-4 text-xs text-stone-500">
+          Pasa el cursor o toca las barras para ver los importes. Con el teclado, usa las flechas
+          izquierda y derecha.
+        </p>
+        <app-chart
+          class="mt-3 block min-w-0"
+          [model]="graph()"
+          label="Comparación mensual de ingresos y gastos en MXN"
+          [selectedIndex]="selectedIndex()"
+          (selectIndex)="selectMonth($event)" />
+        @if (current(); as month) {
+          <div
+            role="status"
+            aria-live="polite"
+            class="mt-3 flex flex-wrap items-center gap-x-6 gap-y-3 border-l-2 border-green-800 py-3 pl-4 text-sm dark:border-green-500">
+            <span class="font-medium">{{ fullMonthLabel(month.month) }}</span>
+            <span
+              >Ingresos
+              <strong class="ml-1 font-medium">{{
+                month.income_total | currency: 'MXN' : 'symbol' : '1.2-2'
+              }}</strong></span
+            >
+            <span
+              >Gastos
+              <strong class="ml-1 font-medium">{{
+                month.expense_total | currency: 'MXN' : 'symbol' : '1.2-2'
+              }}</strong></span
+            >
+            <span
+              >Balance
+              <strong class="ml-1 font-medium">{{
+                month.balance | currency: 'MXN' : 'symbol' : '1.2-2'
+              }}</strong></span
+            >
+          </div>
+        }
+      }
+      <p class="mt-5 text-xs leading-5 text-stone-500">
+        Total del periodo: ingresos
+        {{ trend.income_total | currency: 'MXN' : 'symbol' : '1.2-2' }} · gastos
+        {{ trend.expense_total | currency: 'MXN' : 'symbol' : '1.2-2' }}. Se usa la fecha guardada
+        en cada movimiento; el balance representa estos registros.
+      </p>
+      <details class="mt-5">
+        <summary class="w-fit cursor-pointer text-xs underline underline-offset-4">
+          Ver importes por mes
+        </summary>
+        <div class="mt-4 max-w-full overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <caption class="sr-only">
+              Ingresos, gastos y balance mensual del periodo consultado, en MXN
+            </caption>
+            <thead class="border-b border-stone-200 text-stone-500 dark:border-white/10">
+              <tr>
+                <th scope="col" class="px-3 py-3 font-medium">Mes</th>
+                <th scope="col" class="px-3 py-3 text-right font-medium">Ingresos</th>
+                <th scope="col" class="px-3 py-3 text-right font-medium">Gastos</th>
+                <th scope="col" class="px-3 py-3 text-right font-medium">Balance</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-stone-200 dark:divide-white/10">
+              @for (month of trend.items; track month.month) {
+                <tr>
+                  <th scope="row" class="whitespace-nowrap px-3 py-3 font-normal">
+                    {{ monthLabel(month.month) }}
+                  </th>
+                  <td class="whitespace-nowrap px-3 py-3 text-right">
+                    {{ month.income_total | currency: 'MXN' : 'symbol' : '1.2-2' }}
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-3 text-right">
+                    {{ month.expense_total | currency: 'MXN' : 'symbol' : '1.2-2' }}
+                  </td>
+                  <td class="whitespace-nowrap px-3 py-3 text-right">
+                    {{ month.balance | currency: 'MXN' : 'symbol' : '1.2-2' }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </details>
+    }
+  </section>
+}

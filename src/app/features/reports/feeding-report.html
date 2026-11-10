@@ -1,0 +1,298 @@
+<div class="mx-auto max-w-6xl">
+  <div
+    class="flex flex-wrap items-end justify-between gap-4 border-b border-stone-200 pb-8 dark:border-white/10">
+    <div>
+      <p class="mb-3 text-xs text-stone-500">Mi rancho / Reportes / Alimentación</p>
+      <h1 class="text-2xl font-medium tracking-tight sm:text-3xl">Reporte de alimentación</h1>
+      <p class="mt-3 text-sm text-stone-500">Consumos y costos por animal, lote y alimento.</p>
+    </div>
+    @if (allowed) {
+      <button
+        type="button"
+        (click)="export()"
+        [disabled]="exporting() || loading() || !!error()"
+        class="inline-flex items-center gap-2 rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+        <lucide-icon [img]="download" [size]="16" />{{
+          exporting() ? 'Preparando Excel…' : 'Descargar Excel'
+        }}
+      </button>
+    }
+  </div>
+  @if (!allowed) {
+    <p class="py-12 text-sm text-stone-500">
+      No tienes permiso para consultar el reporte de alimentación.
+    </p>
+  } @else {
+    <form
+      [formGroup]="form"
+      (ngSubmit)="search()"
+      class="my-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div class="min-w-0">
+        <label for="feeding-report-q" class="mb-2 block text-xs"
+          >Alimento, animal, SINIIGA o lote</label
+        ><input
+          id="feeding-report-q"
+          formControlName="q"
+          maxlength="100"
+          class="min-w-0 w-full rounded-lg border border-stone-200 bg-white p-3 text-sm dark:border-white/15 dark:bg-[#171717]" />
+      </div>
+      <div class="min-w-0">
+        <label for="feeding-report-feed" class="mb-2 block text-xs">Alimento</label
+        ><select
+          id="feeding-report-feed"
+          formControlName="feed_id"
+          class="min-w-0 w-full rounded-lg border border-stone-200 bg-white p-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+          <option value="">Todos</option>
+          @for (f of options().feeds; track f.id) {
+            <option [value]="f.id">{{ f.name }} · {{ unitLabel(f.unit_code) }}</option>
+          }
+        </select>
+      </div>
+      <div class="min-w-0">
+        <label for="feeding-report-kind" class="mb-2 block text-xs">Destino</label
+        ><select
+          id="feeding-report-kind"
+          formControlName="target_kind"
+          (change)="changeKind()"
+          class="min-w-0 w-full rounded-lg border border-stone-200 bg-white p-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+          <option value="all">Animales y lotes</option>
+          <option value="animal">Animales</option>
+          <option value="group">Lotes</option>
+        </select>
+      </div>
+      @if (form.controls.target_kind.value !== 'all') {
+        <div class="min-w-0">
+          <label for="feeding-report-target" class="mb-2 block text-xs">{{
+            form.controls.target_kind.value === 'animal' ? 'Animal' : 'Lote'
+          }}</label
+          ><select
+            id="feeding-report-target"
+            formControlName="target_id"
+            class="min-w-0 w-full rounded-lg border border-stone-200 bg-white p-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+            <option value="">Todos</option>
+            @for (t of options().targets; track t.id) {
+              <option [value]="t.id">{{ label(t) }}</option>
+            }
+          </select>
+        </div>
+      }
+      <div class="min-w-0">
+        <label for="feeding-report-from" class="mb-2 block text-xs">Desde</label
+        ><input
+          id="feeding-report-from"
+          type="date"
+          formControlName="date_from"
+          class="min-w-0 w-full rounded-lg border border-stone-200 bg-white p-3 text-sm dark:border-white/15 dark:bg-[#171717]" />
+      </div>
+      <div class="min-w-0">
+        <label for="feeding-report-to" class="mb-2 block text-xs">Hasta</label
+        ><input
+          id="feeding-report-to"
+          type="date"
+          formControlName="date_to"
+          class="min-w-0 w-full rounded-lg border border-stone-200 bg-white p-3 text-sm dark:border-white/15 dark:bg-[#171717]" />
+      </div>
+      <div class="min-w-0">
+        <label for="feeding-report-feed-search" class="mb-2 block text-xs"
+          >Buscar alimento en las opciones</label
+        >
+        <div class="flex gap-3">
+          <input
+            id="feeding-report-feed-search"
+            [formControl]="feedSearch"
+            maxlength="100"
+            placeholder="Nombre del alimento"
+            class="min-w-0 flex-1 rounded-lg border border-stone-200 bg-white p-3 text-sm dark:border-white/15 dark:bg-[#171717]" /><button
+            type="button"
+            (click)="loadOptions()"
+            [disabled]="optionsLoading()"
+            class="shrink-0 rounded-lg border border-stone-200 px-4 py-2 text-xs dark:border-white/15">
+            Buscar
+          </button>
+        </div>
+      </div>
+      @if (form.controls.target_kind.value !== 'all') {
+        <div class="min-w-0">
+          <label for="feeding-report-target-search" class="mb-2 block text-xs">{{
+            form.controls.target_kind.value === 'animal'
+              ? 'Buscar animal en las opciones'
+              : 'Buscar lote en las opciones'
+          }}</label>
+          <div class="flex gap-3">
+            <input
+              id="feeding-report-target-search"
+              [formControl]="targetSearch"
+              maxlength="100"
+              placeholder="Nombre o identificación"
+              class="min-w-0 flex-1 rounded-lg border border-stone-200 bg-white p-3 text-sm dark:border-white/15 dark:bg-[#171717]" /><button
+              type="button"
+              (click)="loadOptions()"
+              [disabled]="optionsLoading()"
+              class="shrink-0 rounded-lg border border-stone-200 px-4 py-2 text-xs dark:border-white/15">
+              Buscar
+            </button>
+          </div>
+        </div>
+      }
+      <div class="flex flex-wrap items-center gap-4 sm:col-span-2 lg:col-span-3">
+        <button
+          type="submit"
+          class="shrink-0 rounded-lg border border-stone-200 px-4 py-2 text-xs dark:border-white/15">
+          Aplicar filtros</button
+        ><button type="button" (click)="reset()" class="text-xs text-stone-500 underline">
+          Restablecer mes actual
+        </button>
+        <p class="text-xs leading-5 text-stone-500">
+          Vacía ambas fechas para consultar todo el historial.
+        </p>
+      </div>
+    </form>
+    @if (optionError()) {
+      <p role="alert" class="mb-4 text-sm text-red-600">
+        {{ optionError() }} <button (click)="loadOptions()" class="underline">Reintentar</button>
+      </p>
+    }
+    @if (exportError()) {
+      <p role="alert" class="mb-4 text-sm text-red-600">{{ exportError() }}</p>
+    }
+    @if (error()) {
+      <p role="alert" class="mb-4 text-sm text-red-600">
+        {{ error() }} <button (click)="load()" class="underline">Reintentar</button>
+      </p>
+    } @else if (loading()) {
+      <p role="status" class="py-12 text-sm text-stone-500">Cargando reporte…</p>
+    } @else {
+      <div class="mb-4 flex flex-wrap justify-between gap-3 text-xs text-stone-500">
+        <p>
+          Período:
+          {{
+            page().date_from
+              ? (page().date_from | date: 'dd/MM/yyyy' : 'UTC')
+              : 'Desde el primer registro'
+          }}
+          —
+          {{
+            page().date_to
+              ? (page().date_to | date: 'dd/MM/yyyy' : 'UTC')
+              : 'Hasta el último registro'
+          }}
+        </p>
+        <p>Consulta al {{ page().as_of | date: 'dd/MM/yyyy' : 'UTC' }}</p>
+      </div>
+      <div class="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <section
+          class="rounded-xl border border-stone-200 bg-stone-50 p-5 dark:border-white/10 dark:bg-[#191b18]">
+          <h2 class="text-xs text-stone-500">Costo conocido de los consumos filtrados</h2>
+          <p class="mt-3 break-words text-2xl font-medium">
+            {{ page().total_cost | currency: 'MXN' : 'symbol' : '1.2-2' }}
+          </p>
+          <p class="mt-2 text-xs text-stone-500">
+            {{ page().total }} consumos · {{ page().total - page().unpriced_count }} con precio
+          </p>
+        </section>
+        <section
+          data-testid="feeding-unit-totals"
+          class="rounded-xl border border-stone-200 p-5 dark:border-white/10">
+          <h2 class="text-xs text-stone-500">Cantidades por unidad</h2>
+          <ul class="mt-3 flex flex-wrap gap-x-6 gap-y-3">
+            @for (u of page().quantities; track u.unit_code) {
+              <li class="text-lg font-medium">
+                {{ u.quantity | number: '1.0-2' }}
+                <span class="text-xs font-normal text-stone-500">{{ unitLabel(u.unit_code) }}</span>
+              </li>
+            } @empty {
+              <li class="text-sm text-stone-500">Sin consumos registrados.</li>
+            }
+          </ul>
+        </section>
+      </div>
+      @if (page().unpriced_count) {
+        <p role="status" class="mb-5 text-sm text-amber-700 dark:text-amber-300">
+          {{ page().unpriced_count }} consumos sin precio vigente. Su costo no se incluye en el
+          total conocido.
+        </p>
+      }
+      <p class="mb-5 text-xs leading-6 text-stone-500">
+        Los totales incluyen todos los resultados filtrados. Las unidades no se convierten ni se
+        suman entre sí. El consumo de un lote corresponde al lote completo; no se distribuye por
+        animal.
+      </p>
+      <div class="overflow-x-auto rounded-xl border border-stone-200 dark:border-white/10">
+        <table class="w-full text-left text-sm">
+          <thead class="bg-stone-50 text-xs text-stone-500 dark:bg-white/5">
+            <tr>
+              <th class="p-4 font-normal">Fecha / destino</th>
+              <th class="p-4 font-normal">Alimento</th>
+              <th class="p-4 font-normal">Cantidad</th>
+              <th class="p-4 font-normal">Precio vigente</th>
+              <th class="p-4 text-right font-normal">Costo</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of page().items; track r.id) {
+              <tr
+                [attr.data-feeding-row]="r.id"
+                class="border-t border-stone-100 dark:border-white/10">
+                <td class="p-4">
+                  <p class="whitespace-nowrap">{{ r.date | date: 'dd/MM/yyyy' : 'UTC' }}</p>
+                  <p class="mt-1 text-xs text-stone-500">
+                    {{ r.animal ? 'Animal' : 'Lote' }} ·
+                    {{
+                      r.animal ? label(r.animal) : r.group ? label(r.group) : 'Sin identificación'
+                    }}
+                  </p>
+                </td>
+                <td class="p-4">{{ r.feed.name }}</td>
+                <td class="whitespace-nowrap p-4">
+                  {{ r.quantity | number: '1.0-2' }} {{ unitLabel(r.feed.unit_code) }}
+                </td>
+                <td class="whitespace-nowrap p-4">
+                  @if (r.unit_cost !== null) {
+                    <p>
+                      {{ r.unit_cost | currency: 'MXN' : 'symbol' : '1.2-4' }} /
+                      {{ unitLabel(r.feed.unit_code) }}
+                    </p>
+                    <p class="mt-1 text-xs text-stone-500">
+                      Desde {{ r.price_from | date: 'dd/MM/yyyy' : 'UTC' }}
+                    </p>
+                  } @else {
+                    <span class="text-stone-500">Sin precio</span>
+                  }
+                </td>
+                <td class="whitespace-nowrap p-4 text-right font-medium">
+                  {{
+                    r.cost !== null
+                      ? (r.cost | currency: 'MXN' : 'symbol' : '1.2-2')
+                      : 'Desconocido'
+                  }}
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="5" class="p-12 text-center text-stone-500">
+                  No hay consumos que coincidan con los filtros.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <div class="mt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-stone-500">
+        <p>El Excel incluye el resumen y todos los consumos de los filtros aplicados.</p>
+        <div class="flex gap-3">
+          <button
+            (click)="load(page().offset - 25)"
+            [disabled]="page().offset === 0"
+            class="rounded-lg border border-stone-200 px-3 py-2 disabled:opacity-40 dark:border-white/10">
+            Anterior</button
+          ><button
+            (click)="load(page().offset + 25)"
+            [disabled]="page().offset + 25 >= page().total"
+            class="rounded-lg border border-stone-200 px-3 py-2 disabled:opacity-40 dark:border-white/10">
+            Siguiente
+          </button>
+        </div>
+      </div>
+    }
+  }
+</div>

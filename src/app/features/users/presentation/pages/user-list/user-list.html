@@ -1,0 +1,340 @@
+<div class="mx-auto max-w-6xl">
+  <div class="flex flex-wrap items-end justify-between gap-5 pb-7">
+    <div>
+      <p class="mb-3 text-xs text-stone-500 dark:text-stone-400">Mi rancho / Administración</p>
+      <h1 class="text-2xl font-medium tracking-tight sm:text-3xl">Usuarios</h1>
+      <p class="mt-3 text-sm leading-6 text-stone-500 dark:text-stone-400">
+        Personas que tienen acceso al rancho y sus responsabilidades.
+      </p>
+    </div>
+    @if (canWrite()) {
+      <button
+        type="button"
+        data-testid="new-user"
+        [disabled]="!canCreate() || loading() || busy()"
+        (click)="openCreate()"
+        class="inline-flex items-center gap-2 rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white hover:bg-green-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950 dark:hover:bg-white">
+        <lucide-icon [img]="plusIcon" [size]="16" aria-hidden="true" /> Nuevo usuario
+      </button>
+    }
+  </div>
+  <nav
+    aria-label="Administración de accesos"
+    class="mb-7 flex gap-7 border-b border-stone-200 text-sm dark:border-white/10">
+    <a
+      routerLink="/dashboard/users"
+      aria-current="page"
+      class="border-b-2 border-green-800 pb-4 font-medium text-green-900 dark:border-green-200 dark:text-green-200"
+      >Usuarios</a
+    >
+    @if (canReadRoles()) {
+      <a
+        routerLink="/dashboard/roles"
+        class="pb-4 text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-white"
+        >Roles y permisos</a
+      >
+    }
+  </nav>
+  @if (success()) {
+    <div
+      role="status"
+      class="mb-5 flex items-start justify-between gap-4 rounded-xl bg-green-50 p-4 text-sm text-green-900 dark:bg-green-950/30 dark:text-green-200">
+      <p>{{ success() }}</p>
+      <button type="button" aria-label="Cerrar mensaje" (click)="success.set('')">×</button>
+    </div>
+  }
+  @if (error()) {
+    <div
+      role="alert"
+      class="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/25 dark:text-red-200">
+      <p>{{ error() }}</p>
+      <button
+        type="button"
+        [disabled]="busy() || loading()"
+        (click)="load()"
+        class="mt-3 underline underline-offset-4">
+        Reintentar
+      </button>
+    </div>
+  }
+  @if (!canRead()) {
+    <p class="rounded-xl border border-stone-200 p-8 text-sm text-stone-500 dark:border-white/10">
+      No tienes permiso para consultar usuarios.
+    </p>
+  } @else if (loading()) {
+    <div
+      role="status"
+      class="rounded-xl border border-stone-200 p-12 text-center text-sm text-stone-500 dark:border-white/10">
+      Cargando usuarios…
+    </div>
+  } @else if (!error()) {
+    @if (canWrite() && !canReadRoles()) {
+      <p class="mb-5 text-xs leading-6 text-stone-500 dark:text-stone-400">
+        Puedes editar los datos de las cuentas. Para crear usuarios o asignar otro rol necesitas
+        permiso para consultar roles.
+      </p>
+    }
+    <div
+      class="overflow-x-auto rounded-xl border border-stone-200 bg-white dark:border-white/10 dark:bg-[#171717]">
+      <table class="w-full min-w-[680px] text-left text-sm">
+        <thead
+          class="border-b border-stone-200 bg-stone-50 text-xs text-stone-500 dark:border-white/10 dark:bg-white/3 dark:text-stone-400">
+          <tr>
+            <th scope="col" class="px-5 py-4 font-medium">Persona</th>
+            <th scope="col" class="px-5 py-4 font-medium">Contacto</th>
+            <th scope="col" class="px-5 py-4 font-medium">Rol</th>
+            <th scope="col" class="px-5 py-4 font-medium">Estado</th>
+            @if (canWrite()) {
+              <th scope="col" class="px-5 py-4 text-right font-medium">Acciones</th>
+            }
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-stone-100 dark:divide-white/5">
+          @for (user of users(); track user.id) {
+            <tr [attr.data-user-id]="user.id" class="hover:bg-stone-50/60 dark:hover:bg-white/3">
+              <td class="px-5 py-5">
+                <span class="font-medium">{{ fullName(user) }}</span>
+                @if (isSelf(user)) {
+                  <span class="ml-2 text-xs text-stone-400">Tú</span>
+                }
+              </td>
+              <td class="px-5 py-5">
+                <span class="block text-xs">{{ user.email }}</span
+                ><span class="mt-1 block text-xs text-stone-500">{{
+                  user.phone || 'Sin teléfono'
+                }}</span>
+              </td>
+              <td class="px-5 py-5 text-xs">{{ roleLabel(user.role_name) }}</td>
+              <td class="px-5 py-5">
+                <span
+                  class="rounded-full px-2.5 py-1 text-[11px]"
+                  [class]="
+                    user.active
+                      ? 'bg-green-50 text-green-800 dark:bg-green-950/40 dark:text-green-200'
+                      : 'bg-stone-100 text-stone-500 dark:bg-white/10 dark:text-stone-400'
+                  "
+                  >{{ user.active ? 'Activo' : 'Inactivo' }}</span
+                >
+              </td>
+              @if (canWrite()) {
+                <td class="px-5 py-5 text-right">
+                  @if (canEdit(user)) {
+                    <div class="flex justify-end gap-4">
+                      <button
+                        type="button"
+                        [attr.aria-label]="'Editar a ' + fullName(user)"
+                        [disabled]="busy()"
+                        (click)="openEdit(user)"
+                        class="text-xs font-medium text-green-800 hover:underline disabled:opacity-50 dark:text-green-200">
+                        Editar
+                      </button>
+                      @if (!isSelf(user)) {
+                        @if (user.active) {
+                          <button
+                            type="button"
+                            [disabled]="busy()"
+                            (click)="askDeactivate(user)"
+                            class="text-xs text-red-700 hover:underline disabled:opacity-50 dark:text-red-300">
+                            Desactivar
+                          </button>
+                        } @else {
+                          <button
+                            type="button"
+                            [disabled]="busy()"
+                            (click)="reactivate(user)"
+                            class="text-xs text-green-800 hover:underline disabled:opacity-50 dark:text-green-200">
+                            Activar
+                          </button>
+                        }
+                      }
+                    </div>
+                  } @else {
+                    <span class="text-xs text-stone-400">Permisos superiores</span>
+                  }
+                </td>
+              }
+            </tr>
+          } @empty {
+            <tr>
+              <td [attr.colspan]="canWrite() ? 5 : 4" class="px-5 py-16 text-center">
+                <lucide-icon
+                  class="mx-auto mb-4 block w-fit text-stone-400"
+                  [img]="usersIcon"
+                  [size]="28"
+                  aria-hidden="true" />
+                <p class="font-medium">No hay usuarios en esta página</p>
+                <p class="mt-2 text-xs text-stone-500">
+                  Crea una cuenta o vuelve a la página anterior.
+                </p>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <div
+      class="mt-5 flex flex-wrap items-center justify-between gap-4 text-xs text-stone-500 dark:text-stone-400">
+      <span>{{ users().length }} usuarios en esta página · Página {{ page() + 1 }}</span>
+      <div class="flex gap-3">
+        <button
+          type="button"
+          [disabled]="page() === 0 || busy()"
+          (click)="changePage(-1)"
+          class="rounded-lg border border-stone-200 px-3 py-2 hover:bg-stone-50 disabled:opacity-40 dark:border-white/10 dark:hover:bg-white/5">
+          Anterior</button
+        ><button
+          type="button"
+          [disabled]="users().length < pageSize || busy()"
+          (click)="changePage(1)"
+          class="rounded-lg border border-stone-200 px-3 py-2 hover:bg-stone-50 disabled:opacity-40 dark:border-white/10 dark:hover:bg-white/5">
+          Siguiente
+        </button>
+      </div>
+    </div>
+  }
+</div>
+
+@if (formOpen()) {
+  <app-modal
+    [title]="editing() ? 'Editar usuario' : 'Nuevo usuario'"
+    [busy]="busy()"
+    (dismiss)="closeForm()">
+    <form [formGroup]="form" (ngSubmit)="save()" novalidate>
+      <fieldset [disabled]="busy()" class="grid gap-5 sm:grid-cols-2">
+        @for (field of fields; track field.key) {
+          <div [class.sm:col-span-2]="field.key === 'email'">
+            <label [for]="'user-' + field.key" class="mb-2 block text-xs font-medium"
+              >{{ field.label }}
+              @if (!field.required) {
+                <span class="font-normal text-stone-400"> · Opcional</span>
+              }
+            </label>
+            <input
+              [id]="'user-' + field.key"
+              [type]="field.type"
+              [formControlName]="field.key"
+              [autocomplete]="field.autocomplete"
+              [attr.maxlength]="field.maxlength"
+              [attr.autofocus]="field.key === 'name' ? '' : null"
+              [attr.aria-invalid]="
+                form.controls[field.key].touched && form.controls[field.key].invalid
+              "
+              [attr.aria-describedby]="'error-' + field.key"
+              class="w-full rounded-lg border border-stone-300 bg-white px-3 py-3 text-sm outline-none focus:border-green-700 focus:ring-2 focus:ring-green-700/10 dark:border-white/15 dark:bg-[#202020]" />
+            @if (form.controls[field.key].touched && form.controls[field.key].invalid) {
+              <p [id]="'error-' + field.key" class="mt-2 text-xs text-red-600 dark:text-red-300">
+                {{ field.key === 'email' ? 'Ingresa un correo válido.' : 'Revisa este campo.' }}
+              </p>
+            }
+          </div>
+        }
+        <div class="sm:col-span-2">
+          <label for="user-role" class="mb-2 block text-xs font-medium">Rol</label>
+          <select
+            id="user-role"
+            formControlName="role_id"
+            class="w-full rounded-lg border border-stone-300 bg-white px-3 py-3 text-sm outline-none focus:border-green-700 disabled:opacity-60 dark:border-white/15 dark:bg-[#202020]"
+            [attr.aria-invalid]="form.controls.role_id.touched && form.controls.role_id.invalid">
+            <option value="" disabled>Selecciona un rol</option>
+            @for (role of availableRoles(); track role.id) {
+              <option [value]="role.id">{{ roleLabel(role.name) }}</option>
+            }
+            @if (!canReadRoles() && editing(); as user) {
+              <option [value]="user.role_id">{{ roleLabel(user.role_name) }}</option>
+            }
+          </select>
+          @if (form.controls.role_id.touched && form.controls.role_id.invalid) {
+            <p class="mt-2 text-xs text-red-600 dark:text-red-300">Selecciona un rol.</p>
+          }
+          @if (editing(); as user) {
+            @if (isSelf(user)) {
+              <p class="mt-2 text-xs text-stone-500">
+                Tu propio rol no se puede cambiar desde esta cuenta.
+              </p>
+            }
+          }
+        </div>
+        <div class="sm:col-span-2">
+          <label for="user-password" class="mb-2 block text-xs font-medium">{{
+            editing() ? 'Nueva contraseña' : 'Contraseña'
+          }}</label>
+          <input
+            id="user-password"
+            type="password"
+            formControlName="password"
+            autocomplete="new-password"
+            maxlength="128"
+            [attr.aria-invalid]="form.controls.password.touched && form.controls.password.invalid"
+            aria-describedby="password-help"
+            class="w-full rounded-lg border border-stone-300 bg-white px-3 py-3 text-sm outline-none focus:border-green-700 focus:ring-2 focus:ring-green-700/10 dark:border-white/15 dark:bg-[#202020]" />
+          <p
+            id="password-help"
+            class="mt-2 text-xs leading-5"
+            [class]="
+              form.controls.password.touched && form.controls.password.invalid
+                ? 'text-red-600 dark:text-red-300'
+                : 'text-stone-500'
+            ">
+            Mínimo 8 caracteres.
+            {{ editing() ? 'Deja vacío para conservar la contraseña actual.' : '' }}
+          </p>
+        </div>
+        @if (editing()) {
+          <label class="flex items-center gap-3 text-sm sm:col-span-2"
+            ><input type="checkbox" formControlName="active" class="size-4 accent-green-800" />
+            Cuenta activa</label
+          >
+        }
+      </fieldset>
+      @if (formError()) {
+        <p
+          role="alert"
+          class="mt-5 rounded-lg bg-red-50 p-3 text-xs leading-6 text-red-700 dark:bg-red-950/30 dark:text-red-200">
+          {{ formError() }}
+        </p>
+      }
+      <div class="mt-7 flex justify-end gap-3 border-t border-stone-200 pt-5 dark:border-white/10">
+        <button
+          type="button"
+          [disabled]="busy()"
+          (click)="closeForm()"
+          class="rounded-lg border border-stone-200 px-4 py-3 text-xs disabled:opacity-50 dark:border-white/15">
+          Cancelar
+        </button>
+        <button
+          type="submit"
+          [disabled]="busy()"
+          class="rounded-lg bg-green-900 px-5 py-3 text-xs font-medium text-white disabled:cursor-wait disabled:opacity-60 dark:bg-stone-100 dark:text-stone-950">
+          {{ busy() ? 'Guardando…' : editing() ? 'Guardar cambios' : 'Crear usuario' }}
+        </button>
+      </div>
+    </form>
+  </app-modal>
+}
+@if (deactivating(); as user) {
+  <app-modal title="Desactivar usuario" [busy]="busy()" (dismiss)="cancelDeactivate()">
+    <p class="text-sm leading-7">
+      {{ fullName(user) }} dejará de tener acceso al rancho. Sus registros e historial se
+      conservarán y podrás activar la cuenta después.
+    </p>
+    @if (formError()) {
+      <p role="alert" class="mt-4 text-sm text-red-700 dark:text-red-300">{{ formError() }}</p>
+    }
+    <div class="mt-7 flex justify-end gap-3">
+      <button
+        type="button"
+        [disabled]="busy()"
+        (click)="cancelDeactivate()"
+        class="rounded-lg border border-stone-200 px-4 py-3 text-xs dark:border-white/15">
+        Cancelar</button
+      ><button
+        type="button"
+        data-testid="confirm-deactivate"
+        [disabled]="busy()"
+        (click)="confirmDeactivate()"
+        class="rounded-lg bg-red-700 px-4 py-3 text-xs font-medium text-white disabled:opacity-50">
+        {{ busy() ? 'Desactivando…' : 'Desactivar usuario' }}
+      </button>
+    </div>
+  </app-modal>
+}

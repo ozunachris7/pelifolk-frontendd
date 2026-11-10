@@ -1,0 +1,613 @@
+@if (!(scheduleOpen() || historyOpen() || applicationOpen())) {
+  <div class="mx-auto max-w-6xl">
+    <div class="flex flex-wrap items-end justify-between gap-5 pb-7">
+      <div>
+        <p class="mb-3 text-xs text-stone-500">Mi rancho / Sanidad</p>
+        <h1 class="text-2xl font-medium tracking-tight sm:text-3xl">Programas sanitarios</h1>
+        <p class="mt-3 text-sm text-stone-500">Aplicaciones periódicas y avisos por animal.</p>
+      </div>
+      @if (canWrite()) {
+        <button
+          type="button"
+          data-testid="new-program"
+          (click)="openForm()"
+          class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950 inline-flex items-center gap-2">
+          <lucide-icon [img]="plus" [size]="16" /> Nuevo programa
+        </button>
+      }
+    </div>
+    <app-health-nav />
+    @if (success()) {
+      <p
+        role="status"
+        class="mb-5 rounded-lg bg-green-50 p-4 text-sm text-green-900 dark:bg-green-950/30 dark:text-green-200">
+        {{ success() }}
+      </p>
+    }
+    @if (!canRead()) {
+      <p class="py-10 text-sm text-stone-500">
+        No tienes permiso para consultar programas sanitarios.
+      </p>
+    } @else {
+      <form (submit)="$event.preventDefault(); load()" class="mb-6 flex flex-wrap items-end gap-3">
+        <div class="min-w-0 max-w-md flex-1 basis-52">
+          <label for="program-search" class="mb-2 block text-xs">Buscar programa</label
+          ><input
+            id="program-search"
+            type="search"
+            [value]="search()"
+            (input)="search.set($any($event.target).value)"
+            placeholder="Nombre"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]" />
+        </div>
+        <div>
+          <label for="program-status" class="mb-2 block text-xs">Estado</label
+          ><select
+            id="program-status"
+            [value]="status()"
+            (change)="status.set($any($event.target).value); load()"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+            <option value="active">Activos</option>
+            <option value="inactive">Inactivos</option>
+            <option value="all">Todos</option>
+          </select>
+        </div>
+        <button
+          type="submit"
+          [disabled]="loading()"
+          class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+          Buscar
+        </button>
+      </form>
+      @if (error()) {
+        <p role="alert" class="mb-4 text-sm text-red-600">{{ error() }}</p>
+        <button type="button" (click)="load(page().offset)" class="text-sm underline">
+          Reintentar
+        </button>
+      }
+      @if (loading()) {
+        <p role="status" class="py-12 text-sm text-stone-500">Cargando programas…</p>
+      } @else if (!error()) {
+        <div class="overflow-x-auto rounded-xl border border-stone-200 dark:border-white/10">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-stone-50 text-xs text-stone-500 dark:bg-white/5">
+              <tr>
+                <th class="p-4 font-normal">Programa / Producto</th>
+                <th class="p-4 font-normal">Intervalo</th>
+                <th class="p-4 font-normal">Aplica a</th>
+                <th class="p-4 font-normal">Aviso</th>
+                <th class="p-4 font-normal">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (program of page().items; track program.id) {
+                <tr
+                  [attr.data-program-id]="program.id"
+                  class="border-t border-stone-100 dark:border-white/10">
+                  <td class="max-w-xs break-words p-4">
+                    <p class="font-medium">{{ program.name }}</p>
+                    <p class="mt-1 text-xs text-stone-500">
+                      {{ program.product.name }} · {{ program.active ? 'Activo' : 'Inactivo' }}
+                    </p>
+                    @if (!program.product.active) {
+                      <p class="mt-1 text-xs text-red-600">Producto inactivo</p>
+                    }
+                  </td>
+                  <td class="whitespace-nowrap p-4">{{ program.interval_days }} días</td>
+                  <td class="p-4 text-xs text-stone-500">
+                    {{
+                      program.sex === 'male'
+                        ? 'Machos'
+                        : program.sex === 'female'
+                          ? 'Hembras'
+                          : 'Ambos sexos'
+                    }}
+                    <p class="mt-1">Desde {{ program.minimum_age_days }} días de edad</p>
+                  </td>
+                  <td class="whitespace-nowrap p-4 text-xs text-stone-500">
+                    {{ program.notice_days }} días antes
+                  </td>
+                  <td class="p-4">
+                    <div class="flex items-center gap-2">
+                      <button
+                        type="button"
+                        (click)="openSchedule(program)"
+                        [attr.aria-label]="'Ver avisos de ' + program.name"
+                        class="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-green-900 hover:bg-stone-100 dark:text-green-300 dark:hover:bg-white/5">
+                        <lucide-icon [img]="bell" [size]="16" /> Avisos
+                      </button>
+                      @if (canWrite()) {
+                        <button
+                          type="button"
+                          (click)="openForm(program)"
+                          [attr.aria-label]="'Editar ' + program.name"
+                          class="rounded-lg p-2 text-stone-500 hover:bg-stone-100 dark:hover:bg-white/5">
+                          <lucide-icon [img]="pencil" [size]="18" />
+                        </button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="5" class="p-12 text-center text-stone-500">
+                    No hay programas para estos filtros.
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-stone-500">
+          <p>{{ page().total }} programas</p>
+          <div class="flex gap-3">
+            <button
+              type="button"
+              [disabled]="page().offset === 0"
+              (click)="load(page().offset - 25)"
+              class="rounded-lg border border-stone-200 px-3 py-2 disabled:opacity-40 dark:border-white/10">
+              Anterior</button
+            ><button
+              type="button"
+              [disabled]="page().offset + 25 >= page().total"
+              (click)="load(page().offset + 25)"
+              class="rounded-lg border border-stone-200 px-3 py-2 disabled:opacity-40 dark:border-white/10">
+              Siguiente
+            </button>
+          </div>
+        </div>
+      }
+    }
+  </div>
+}
+@if (formOpen()) {
+  <app-modal
+    [title]="editing() ? 'Editar programa' : 'Nuevo programa sanitario'"
+    [busy]="busy()"
+    (dismiss)="closeForm()"
+    ><form [formGroup]="form" (ngSubmit)="save()">
+      <fieldset [disabled]="busy()" class="min-w-0 space-y-5">
+        <div>
+          <label for="program-name" class="mb-2 block text-xs">Nombre *</label
+          ><input
+            id="program-name"
+            formControlName="name"
+            maxlength="150"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]" />
+        </div>
+        <div>
+          <label for="program-product-search" class="mb-2 block text-xs">Buscar producto</label>
+          <div class="flex gap-2">
+            <input
+              id="program-product-search"
+              type="search"
+              [value]="productSearch()"
+              (input)="productSearch.set($any($event.target).value)"
+              class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717] min-w-0" /><button
+              type="button"
+              (click)="loadProducts()"
+              [disabled]="productLoading()"
+              class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+              Buscar
+            </button>
+          </div>
+        </div>
+        @if (productLoading()) {
+          <p role="status" class="text-xs text-stone-500">Cargando productos…</p>
+        }
+        @if (productError()) {
+          <p role="alert" class="text-sm text-red-600">{{ productError() }}</p>
+        }
+        <div>
+          <label for="program-product" class="mb-2 block text-xs">Producto *</label
+          ><select
+            id="program-product"
+            formControlName="product_id"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+            <option value="">Selecciona un producto activo</option>
+            @for (product of products(); track product.id) {
+              <option [value]="product.id">
+                {{ product.name }}{{ product.active ? '' : ' (inactivo)' }}
+              </option>
+            }
+          </select>
+          <p class="mt-2 text-xs leading-5 text-stone-500">
+            Hasta 100 resultados. Una vez que el programa tenga aplicaciones, conservará su
+            producto.
+          </p>
+        </div>
+        <div class="grid gap-5 sm:grid-cols-2">
+          <div>
+            <label for="program-interval" class="mb-2 block text-xs">Intervalo en días *</label
+            ><input
+              id="program-interval"
+              type="number"
+              min="1"
+              max="36500"
+              step="1"
+              formControlName="interval_days"
+              class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]" />
+          </div>
+          <div>
+            <label for="program-age" class="mb-2 block text-xs">Edad mínima en días *</label
+            ><input
+              id="program-age"
+              type="number"
+              min="0"
+              max="36500"
+              step="1"
+              formControlName="minimum_age_days"
+              class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]" />
+          </div>
+          <div>
+            <label for="program-sex" class="mb-2 block text-xs">Sexo</label
+            ><select
+              id="program-sex"
+              formControlName="sex"
+              class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+              <option value="">Ambos sexos</option>
+              <option value="male">Machos</option>
+              <option value="female">Hembras</option>
+            </select>
+          </div>
+          <div>
+            <label for="program-notice" class="mb-2 block text-xs"
+              >Avisar con días de anticipación *</label
+            ><input
+              id="program-notice"
+              type="number"
+              min="0"
+              max="36500"
+              step="1"
+              formControlName="notice_days"
+              class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]" />
+          </div>
+        </div>
+        <label class="flex items-center gap-3 text-sm"
+          ><input
+            id="program-active"
+            type="checkbox"
+            formControlName="active"
+            class="accent-green-900" />
+          Programa activo</label
+        >
+        <p class="text-xs leading-5 text-stone-500">
+          La primera fecha se calcula desde el nacimiento y la edad mínima. Las siguientes, desde la
+          última aplicación registrada en este programa. Cambiar el intervalo o la edad recalcula
+          los avisos.
+        </p>
+        @if (form.invalid && form.touched) {
+          <p role="alert" class="text-sm text-red-600">
+            Completa los campos; los días deben ser enteros y el intervalo mayor que cero.
+          </p>
+        }
+        @if (formError()) {
+          <p role="alert" class="text-sm text-red-600">{{ formError() }}</p>
+        }
+        <div class="flex justify-end gap-3 border-t border-stone-200 pt-5 dark:border-white/10">
+          <button type="button" (click)="closeForm()" class="px-4 py-3 text-xs">Cancelar</button
+          ><button
+            type="submit"
+            class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+            {{ busy() ? 'Guardando…' : 'Guardar programa' }}
+          </button>
+        </div>
+      </fieldset>
+    </form></app-modal
+  >
+}
+@if (scheduleOpen()) {
+  <app-detail-page title="Avisos del programa" (dismiss)="closeSchedule()"
+    ><p class="mb-4 text-lg font-medium">{{ selectedProgram()?.name }}</p>
+    <p class="mb-5 text-xs leading-5 text-stone-500">
+      Se muestran animales del hato que coinciden con el sexo del programa. Los tratamientos
+      registrados fuera de este programa no cambian su próxima fecha.
+    </p>
+    @if (!selectedProgram()?.active || !selectedProgram()?.product?.active) {
+      <p class="mb-4 text-sm text-red-600">
+        Activa el programa y su producto para registrar aplicaciones.
+      </p>
+    }
+    <form
+      (submit)="$event.preventDefault(); loadSchedule()"
+      class="mb-6 flex flex-wrap items-end gap-3">
+      <div class="min-w-0 flex-1 basis-44">
+        <label for="notice-search" class="mb-2 block text-xs">Buscar animal</label
+        ><input
+          id="notice-search"
+          type="search"
+          [value]="scheduleSearch()"
+          (input)="scheduleSearch.set($any($event.target).value)"
+          placeholder="Nombre o SINIIGA"
+          class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]" />
+      </div>
+      <div>
+        <label for="notice-state" class="mb-2 block text-xs">Mostrar</label
+        ><select
+          id="notice-state"
+          [value]="noticeState()"
+          (change)="noticeState.set($any($event.target).value); loadSchedule()"
+          class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+          <option value="attention">Avisos pendientes</option>
+          <option value="all">Todos</option>
+          <option value="overdue">Vencidas</option>
+          <option value="due">Para hoy</option>
+          <option value="upcoming">Próximas</option>
+          <option value="scheduled">Programadas</option>
+          <option value="missing_birth_date">Falta nacimiento</option>
+        </select>
+      </div>
+      <button
+        type="submit"
+        [disabled]="scheduleLoading()"
+        class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+        Buscar
+      </button>
+    </form>
+    @if (scheduleError()) {
+      <p role="alert" class="mb-4 text-sm text-red-600">{{ scheduleError() }}</p>
+      <button type="button" (click)="loadSchedule()" class="text-sm underline">Reintentar</button>
+    }
+    @if (scheduleLoading()) {
+      <p role="status" class="py-10 text-sm text-stone-500">Calculando avisos…</p>
+    } @else if (!scheduleError()) {
+      @if (schedule(); as schedule) {
+        <p class="mb-4 text-xs text-stone-500">
+          {{ schedule.total }} animales · Calculado al
+          {{ schedule.as_of | date: 'dd/MM/yyyy' : 'UTC' }}
+        </p>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead class="text-stone-500">
+              <tr>
+                <th class="p-3 font-normal">Animal</th>
+                <th class="p-3 font-normal">Última / Próxima</th>
+                <th class="p-3 font-normal">Estado</th>
+                <th class="p-3 font-normal">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (notice of schedule.items; track notice.animal.id) {
+                <tr
+                  [attr.data-notice-id]="notice.animal.id"
+                  class="border-t border-stone-200 dark:border-white/10">
+                  <td class="p-3">{{ label(notice.animal) }}</td>
+                  <td class="whitespace-nowrap p-3 text-stone-500">
+                    <p>
+                      {{
+                        notice.last_application
+                          ? (notice.last_application | date: 'dd/MM/yyyy' : 'UTC')
+                          : 'Sin aplicaciones'
+                      }}
+                    </p>
+                    <p class="mt-1">
+                      {{
+                        notice.due_date
+                          ? (notice.due_date | date: 'dd/MM/yyyy' : 'UTC')
+                          : 'Sin fecha calculada'
+                      }}
+                    </p>
+                  </td>
+                  <td class="p-3" [class.text-red-600]="notice.status === 'overdue'">
+                    <p>{{ noticeLabel(notice.status) }}</p>
+                    @if (notice.days_remaining !== null) {
+                      <p class="mt-1 text-stone-500">
+                        {{
+                          notice.days_remaining < 0
+                            ? -notice.days_remaining + ' días de atraso'
+                            : notice.days_remaining === 0
+                              ? 'Hoy'
+                              : 'En ' + notice.days_remaining + ' días'
+                        }}
+                      </p>
+                    }
+                  </td>
+                  <td class="p-3">
+                    <div class="flex gap-2">
+                      @if (canApply() && notice.can_apply) {
+                        <button
+                          type="button"
+                          (click)="openApplication(notice)"
+                          [attr.aria-label]="'Registrar aplicación a ' + label(notice.animal)"
+                          class="rounded-lg px-3 py-2 text-green-900 hover:bg-stone-100 dark:text-green-300 dark:hover:bg-white/5">
+                          Aplicar
+                        </button>
+                      }
+                      <button
+                        type="button"
+                        (click)="openHistory(notice)"
+                        [attr.aria-label]="'Ver aplicaciones de ' + label(notice.animal)"
+                        class="rounded-lg p-2 text-stone-500 hover:bg-stone-100 dark:hover:bg-white/5">
+                        <lucide-icon [img]="clock" [size]="17" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="4" class="py-10 text-center text-stone-500">
+                    No hay animales para estos filtros. Cambia Mostrar a Todos para ver próximas
+                    fechas.
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-5 flex justify-end gap-3">
+          <button
+            type="button"
+            [disabled]="schedule.offset === 0"
+            (click)="loadSchedule(schedule.offset - 25)"
+            class="rounded-lg border border-stone-200 px-3 py-2 text-xs disabled:opacity-40 dark:border-white/10">
+            Anterior</button
+          ><button
+            type="button"
+            [disabled]="schedule.offset + 25 >= schedule.total"
+            (click)="loadSchedule(schedule.offset + 25)"
+            class="rounded-lg border border-stone-200 px-3 py-2 text-xs disabled:opacity-40 dark:border-white/10">
+            Siguiente
+          </button>
+        </div>
+      }
+    }
+  </app-detail-page>
+}
+@if (applicationOpen()) {
+  <app-modal title="Registrar aplicación" [busy]="busy()" (dismiss)="closeApplication()"
+    ><p class="mb-2 text-lg font-medium">
+      {{ selectedAnimal() ? label(selectedAnimal()!.animal) : '' }}
+    </p>
+    <p class="mb-5 text-sm text-stone-500">
+      {{ selectedProgram()?.name }} · {{ selectedProgram()?.product?.name }}
+    </p>
+    @if (selectedAnimal(); as selected) {
+      <app-reaction-summary [animalId]="selected.animal.id" />
+    }
+    <form [formGroup]="applicationForm" (ngSubmit)="apply()">
+      <fieldset [disabled]="busy() || catalogLoading()" class="min-w-0 space-y-5">
+        @if (catalogLoading()) {
+          <p role="status" class="text-xs text-stone-500">Cargando unidades y vías…</p>
+        }
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label for="application-dose" class="mb-2 block text-xs">Dosis *</label
+            ><input
+              id="application-dose"
+              type="number"
+              min="0.001"
+              max="9999999.999"
+              step="0.001"
+              formControlName="dose_value"
+              class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]" />
+          </div>
+          <div>
+            <label for="application-unit" class="mb-2 block text-xs">Unidad de la dosis *</label
+            ><select
+              id="application-unit"
+              formControlName="dose_unit_id"
+              class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+              <option [ngValue]="0">Selecciona una unidad</option>
+              @for (unit of catalogs()?.units ?? []; track unit.id) {
+                <option [ngValue]="unit.id">{{ catalogLabel(unit.code) }}</option>
+              }
+            </select>
+          </div>
+          <div>
+            <label for="application-route" class="mb-2 block text-xs">Vía de administración *</label
+            ><select
+              id="application-route"
+              formControlName="route_id"
+              class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+              <option [ngValue]="0">Selecciona una vía</option>
+              @for (route of catalogs()?.routes ?? []; track route.id) {
+                <option [ngValue]="route.id">{{ catalogLabel(route.name) }}</option>
+              }
+            </select>
+          </div>
+          <div>
+            <label for="application-frequency" class="mb-2 block text-xs">Frecuencia en horas</label
+            ><input
+              id="application-frequency"
+              type="number"
+              min="1"
+              max="2147483647"
+              step="1"
+              formControlName="frequency_hours"
+              placeholder="Opcional"
+              class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]" />
+          </div>
+          <div>
+            <label for="application-start" class="mb-2 block text-xs">Fecha de inicio *</label
+            ><input
+              id="application-start"
+              type="date"
+              formControlName="start_date"
+              [max]="today"
+              class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717] min-w-0" />
+          </div>
+          <div>
+            <label for="application-duration" class="mb-2 block text-xs">Duración en días *</label
+            ><input
+              id="application-duration"
+              type="number"
+              min="1"
+              max="3650"
+              step="1"
+              formControlName="duration_days"
+              class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]" />
+          </div>
+        </div>
+        @if (
+          lastTreatmentDay(
+            applicationForm.controls.start_date.value,
+            applicationForm.controls.duration_days.value
+          );
+          as last
+        ) {
+          <p class="text-xs text-stone-500">
+            Último día: {{ last | date: 'dd/MM/yyyy' : 'UTC' }}. La próxima aplicación se calculará
+            desde esta fecha de inicio más el intervalo del programa.
+          </p>
+        }
+        @if (applicationForm.invalid && applicationForm.touched) {
+          <p role="alert" class="text-sm text-red-600">
+            Completa la dosis, unidad, vía, fecha y duración.
+          </p>
+        }
+        @if (applicationError()) {
+          <p role="alert" class="text-sm text-red-600">{{ applicationError() }}</p>
+        }
+        <div class="flex justify-end gap-3 border-t border-stone-200 pt-5 dark:border-white/10">
+          <button type="button" (click)="closeApplication()" class="px-4 py-3 text-xs">
+            Cancelar</button
+          ><button
+            type="submit"
+            [disabled]="!catalogs()"
+            class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+            {{ busy() ? 'Guardando…' : 'Guardar aplicación' }}
+          </button>
+        </div>
+      </fieldset>
+    </form></app-modal
+  >
+}
+@if (historyOpen()) {
+  <app-detail-page
+    title="Aplicaciones del programa"
+    backLabel="Volver a los avisos"
+    [busy]="busy()"
+    (dismiss)="closeHistory()"
+    ><p class="mb-2 text-lg font-medium">
+      {{ selectedAnimal() ? label(selectedAnimal()!.animal) : '' }}
+    </p>
+    <p class="mb-6 text-sm text-stone-500">{{ selectedProgram()?.name }}</p>
+    @if (historyLoading()) {
+      <p role="status" class="py-10 text-sm text-stone-500">Cargando aplicaciones…</p>
+    }
+    @if (historyError()) {
+      <p role="alert" class="text-sm text-red-600">{{ historyError() }}</p>
+    }
+    <ol class="space-y-5 border-l border-stone-200 pl-4 dark:border-white/10">
+      @for (treatment of applications(); track treatment.id + '-' + treatment.product.id) {
+        <li>
+          <p class="text-sm font-medium">{{ treatment.product.name }}</p>
+          <p class="mt-2 text-xs text-stone-500">
+            {{ treatment.start_date | date: 'dd/MM/yyyy' : 'UTC' }} al
+            {{ treatment.last_day | date: 'dd/MM/yyyy' : 'UTC' }} · {{ treatment.dose_value }}
+            {{ catalogLabel(treatment.dose_unit_code) }} · {{ catalogLabel(treatment.route_name) }}
+          </p>
+          <p class="mt-2 text-xs text-stone-500">{{ treatment.recorded_by }}</p>
+          <app-treatment-doses
+            [treatment]="treatment"
+            [canWrite]="canDose()"
+            (busyChange)="busy.set($event)" />
+        </li>
+      } @empty {
+        @if (!historyLoading() && !historyError()) {
+          <li class="text-xs text-stone-500">Sin aplicaciones registradas en este programa.</li>
+        }
+      }
+    </ol></app-detail-page
+  >
+}

@@ -1,0 +1,206 @@
+<div class="mx-auto min-w-0 max-w-6xl">
+  <p class="mb-3 text-xs text-stone-500">Mi rancho / Manejo</p>
+  <h1 class="text-2xl font-medium tracking-tight sm:text-3xl">Comparar pesos</h1>
+  <p class="mb-7 mt-3 text-sm leading-6 text-stone-500">
+    Consulta la evolución de dos a cinco animales en una misma gráfica, por fecha de pesaje.
+  </p>
+  <app-management-nav />
+  @if (!allowed()) {
+    <p class="py-10 text-sm text-stone-500">No tienes permiso para consultar pesajes.</p>
+  } @else {
+    <section
+      aria-label="Animales y periodo de comparación"
+      class="border-b border-stone-200 pb-7 dark:border-white/10">
+      @if (animals().length < 5) {
+        <app-comparison-animal-select class="block max-w-xl" (selectedChange)="add($event)" />
+      }
+      <p class="mt-3 text-xs text-stone-500">
+        {{ animals().length }} de 5 animales seleccionados. Puedes buscar por nombre o SINIIGA,
+        incluidos animales con salida registrada.
+      </p>
+      <ul class="mt-4 flex min-w-0 flex-wrap gap-3" aria-label="Animales seleccionados">
+        @for (animal of animals(); track animal.id; let i = $index) {
+          <li
+            class="flex min-w-0 max-w-full items-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-xs dark:border-white/15">
+            <span
+              class="h-2.5 w-2.5 shrink-0 rounded-full"
+              [style.backgroundColor]="color(i)"
+              aria-hidden="true"></span>
+            <span class="min-w-0 break-words">{{ label(animal) }}</span>
+            <button
+              type="button"
+              (click)="remove(animal.id)"
+              [attr.aria-label]="'Quitar ' + label(animal)"
+              class="shrink-0 px-2 py-1 text-base">
+              ×
+            </button>
+          </li>
+        }
+      </ul>
+      @if (notice()) {
+        <p role="status" class="mt-3 text-xs text-stone-500">{{ notice() }}</p>
+      }
+      <form
+        (submit)="$event.preventDefault(); compare()"
+        class="mt-5 grid grid-cols-2 items-end gap-3 sm:flex sm:flex-wrap">
+        <div class="min-w-0">
+          <label for="comparison-from" class="mb-2 block text-xs">Desde</label
+          ><input
+            id="comparison-from"
+            type="date"
+            [value]="from()"
+            [max]="today"
+            (input)="dateChange('from', $any($event.target).value)"
+            class="w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm dark:border-white/15 dark:bg-[#171717]" />
+        </div>
+        <div class="min-w-0">
+          <label for="comparison-to" class="mb-2 block text-xs">Hasta</label
+          ><input
+            id="comparison-to"
+            type="date"
+            required
+            [value]="to()"
+            [max]="today"
+            (input)="dateChange('to', $any($event.target).value)"
+            class="w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 py-2.5 text-sm dark:border-white/15 dark:bg-[#171717]" />
+        </div>
+        <button
+          type="submit"
+          [disabled]="loading()"
+          class="col-span-2 rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+          {{ loading() ? 'Consultando…' : 'Comparar pesos' }}
+        </button>
+        <button
+          type="button"
+          (click)="allDates()"
+          class="col-span-2 px-2 py-3 text-xs underline underline-offset-4">
+          Todo el historial
+        </button>
+      </form>
+      <p class="mt-3 text-xs leading-5 text-stone-500">
+        Selecciona los animales y pulsa Comparar pesos. Desde vacío incluye todo el historial hasta
+        la fecha elegida. Los destetes con peso también se incluyen.
+      </p>
+    </section>
+    @if (error()) {
+      <p role="alert" class="mt-5 text-sm text-red-600 dark:text-red-400">{{ error() }}</p>
+    }
+    @if (loading()) {
+      <p role="status" class="py-10 text-sm text-stone-500">
+        Consultando los historiales completos…
+      </p>
+    }
+    @if (data(); as histories) {
+      <section class="pt-7" aria-label="Resultado de la comparación">
+        <h2 class="text-base font-medium">Evolución del peso · kg</h2>
+        <p class="mt-2 text-xs leading-5 text-stone-500">
+          {{ from() ? (from() | date: 'dd/MM/yyyy' : 'UTC') : 'Primer registro' }} —
+          {{ to() | date: 'dd/MM/yyyy' : 'UTC' }}. La distancia entre puntos corresponde al tiempo
+          transcurrido. Las líneas solo unen pesajes conocidos de cada animal, sin estimar pesos
+          intermedios. Se compara por fecha, no por edad.
+        </p>
+        <ul class="mt-4 flex flex-wrap gap-x-6 gap-y-3 text-xs" aria-label="Leyenda de animales">
+          @for (history of histories; track history.animal.id; let i = $index) {
+            <li class="inline-flex max-w-full items-start gap-2">
+              <span
+                class="mt-1 h-2.5 w-2.5 shrink-0 rounded-sm"
+                [style.backgroundColor]="color(i)"
+                aria-hidden="true"></span
+              ><span class="min-w-0 break-words"
+                >{{ label(history.animal) }} · {{ history.items.length }} registros
+                @if (!history.items.length) {
+                  <strong class="font-medium">· Sin pesajes en este periodo</strong>
+                }
+              </span>
+            </li>
+          }
+        </ul>
+        @if (dates().length) {
+          <app-chart
+            class="mt-5 block min-w-0"
+            [model]="graph()"
+            label="Comparación de pesos por animal y fecha, en kilogramos"
+            [selectedIndex]="selected()"
+            (selectIndex)="selected.set($event)" />
+          @if (dates().length === 1) {
+            <p class="mt-3 text-xs text-stone-500">
+              Solo hay una fecha registrada en el periodo; todavía no permite comparar la evolución.
+            </p>
+          }
+          @if (currentDate(); as day) {
+            <div
+              class="mt-5 border-l-2 border-sky-600 py-3 pl-4 dark:border-sky-400"
+              aria-live="polite"
+              data-testid="comparison-selection">
+              <h3 class="text-sm font-medium">{{ day | date: 'dd/MM/yyyy' : 'UTC' }}</h3>
+              <ul class="mt-3 grid gap-3 text-xs sm:grid-cols-2">
+                @for (history of histories; track history.animal.id) {
+                  <li class="min-w-0 break-words">
+                    <span>{{ label(history.animal) }}: </span>
+                    @if (weight(history, day); as w) {
+                      <strong class="font-medium">{{ w.weight_kg | number: '1.2-2' }} kg</strong>
+                      @if (w.is_weaning) {
+                        <span> · Destete</span>
+                      }
+                    } @else {
+                      <span class="text-stone-500">Sin pesaje ese día</span>
+                    }
+                  </li>
+                }
+              </ul>
+            </div>
+          }
+        } @else {
+          <p
+            role="status"
+            class="my-6 border-l-2 border-stone-300 py-6 pl-4 text-sm text-stone-500 dark:border-white/15">
+            No hay pesajes de los animales seleccionados en este periodo. Prueba con otras fechas.
+          </p>
+        }
+        <details class="mt-6">
+          <summary class="w-fit cursor-pointer text-xs underline underline-offset-4">
+            Ver pesos por fecha
+          </summary>
+          <div class="mt-4 max-w-full overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <caption class="sr-only">
+                Pesos registrados por animal y fecha; un guion indica ausencia de medición
+              </caption>
+              <thead class="border-b border-stone-200 text-stone-500 dark:border-white/10">
+                <tr>
+                  <th scope="col" class="px-3 py-3 font-medium">Fecha</th>
+                  @for (history of histories; track history.animal.id) {
+                    <th scope="col" class="min-w-32 px-3 py-3 text-right font-medium">
+                      {{ label(history.animal) }}
+                    </th>
+                  }
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-stone-200 dark:divide-white/10">
+                @for (day of dates(); track day) {
+                  <tr>
+                    <th scope="row" class="whitespace-nowrap px-3 py-3 font-normal">
+                      {{ day | date: 'dd/MM/yyyy' : 'UTC' }}
+                    </th>
+                    @for (history of histories; track history.animal.id) {
+                      <td class="whitespace-nowrap px-3 py-3 text-right">
+                        @if (weight(history, day); as w) {
+                          {{ w.weight_kg | number: '1.2-2' }} kg
+                          @if (w.is_weaning) {
+                            <span class="block text-stone-500">Destete</span>
+                          }
+                        } @else {
+                          <span aria-label="Sin pesaje ese día">—</span>
+                        }
+                      </td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </details>
+      </section>
+    }
+  }
+</div>

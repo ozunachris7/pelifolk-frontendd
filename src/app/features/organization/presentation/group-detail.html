@@ -1,0 +1,359 @@
+<div class="mx-auto max-w-6xl">
+  <a
+    routerLink="/dashboard/groups"
+    class="mb-5 inline-flex items-center gap-2 text-xs text-stone-500 hover:underline"
+    ><lucide-icon [img]="backIcon" [size]="14" aria-hidden="true" /> Volver a lotes</a
+  >
+  <div class="flex flex-wrap items-end justify-between gap-5 pb-7">
+    <div>
+      <p class="mb-3 text-xs text-stone-500 dark:text-stone-400">Mi rancho / Lotes</p>
+      <h1 class="text-2xl font-medium tracking-tight sm:text-3xl">{{ group()?.name || 'Lote' }}</h1>
+      <p class="mt-3 text-sm leading-6 text-stone-500 dark:text-stone-400">
+        {{ group()?.description || 'Animales e historial de movimientos de este lote.' }}
+      </p>
+      @if (group(); as item) {
+        <p class="mt-2 text-xs text-stone-500">
+          {{ item.member_count }} animales actuales ·
+          {{ item.active ? 'Lote activo' : 'Lote inactivo' }}
+        </p>
+      }
+    </div>
+    @if (canWrite() && group()?.active) {
+      <button
+        type="button"
+        data-testid="assign-animals"
+        (click)="openAssign()"
+        [disabled]="loading() || busy()"
+        class="inline-flex items-center gap-2 rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+        <lucide-icon [img]="plusIcon" [size]="16" aria-hidden="true" /> Asignar animales
+      </button>
+    }
+  </div>
+  <app-organization-nav />
+  @if (success()) {
+    <div
+      role="status"
+      class="mb-5 flex justify-between gap-4 rounded-lg bg-green-50 p-4 text-sm text-green-900 dark:bg-green-950/30 dark:text-green-200">
+      <p>{{ success() }}</p>
+      <button type="button" aria-label="Cerrar mensaje" (click)="success.set('')">×</button>
+    </div>
+  }
+  @if (!canRead()) {
+    <p class="py-10 text-sm text-stone-500">No tienes permiso para consultar este lote.</p>
+  } @else {
+    <div class="mb-6 flex gap-5 text-sm">
+      <button
+        type="button"
+        (click)="setView(true)"
+        [disabled]="loading()"
+        [attr.aria-pressed]="current()"
+        [class.font-semibold]="current()"
+        class="pb-2 text-stone-500 aria-pressed:text-green-800 dark:aria-pressed:text-green-200">
+        Animales actuales</button
+      ><button
+        type="button"
+        (click)="setView(false)"
+        [disabled]="loading()"
+        [attr.aria-pressed]="!current()"
+        [class.font-semibold]="!current()"
+        class="pb-2 text-stone-500 aria-pressed:text-green-800 dark:aria-pressed:text-green-200"
+        data-testid="group-history">
+        Historial completo
+      </button>
+    </div>
+    @if (error()) {
+      <div
+        role="alert"
+        class="mb-5 rounded-lg bg-red-50 p-4 text-sm text-red-800 dark:bg-red-950/25 dark:text-red-200">
+        {{ error() }}
+        <button type="button" (click)="load()" class="ml-2 underline">Reintentar</button>
+      </div>
+    }
+    @if (loading()) {
+      <p role="status" class="py-12 text-center text-sm text-stone-500">
+        Cargando animales del lote…
+      </p>
+    } @else if (!error()) {
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[600px] text-left text-sm">
+          <thead
+            class="border-y border-stone-200 text-xs text-stone-500 dark:border-white/10 dark:text-stone-400">
+            <tr>
+              <th scope="col" class="py-4 pr-4 font-medium">Animal</th>
+              <th scope="col" class="px-4 py-4 font-medium">Ingreso</th>
+              <th scope="col" class="px-4 py-4 font-medium">Último día en el lote</th>
+              <th scope="col" class="py-4 pl-4 text-right font-medium">Acciones</th>
+            </tr>
+          </thead>
+          <tbody
+            class="divide-y divide-stone-200 border-b border-stone-200 dark:divide-white/10 dark:border-white/10">
+            @for (member of memberships(); track member.animal_id + member.start_date) {
+              <tr [attr.data-member-id]="member.animal_id">
+                <th scope="row" class="py-5 pr-4 align-top font-normal">
+                  <span class="font-medium">{{ member.animal_name || 'Sin nombre' }}</span
+                  ><span class="mt-1 block text-xs text-stone-500">{{
+                    member.siniiga || 'SINIIGA pendiente'
+                  }}</span>
+                </th>
+                <td class="px-4 py-5 align-top text-xs">
+                  {{ member.start_date | date: 'dd/MM/yyyy' : 'UTC' }}
+                </td>
+                <td class="px-4 py-5 align-top text-xs text-stone-500">
+                  {{
+                    member.end_date
+                      ? (member.end_date | date: 'dd/MM/yyyy' : 'UTC')
+                      : 'Continúa en el lote'
+                  }}
+                </td>
+                <td class="py-5 pl-4 align-top">
+                  <div class="flex justify-end gap-4">
+                    @if (canWrite() && current() && !member.end_date) {
+                      <button
+                        type="button"
+                        (click)="openMove(member)"
+                        [attr.aria-label]="'Mover animal ' + (member.animal_name || member.siniiga)"
+                        class="inline-flex items-center gap-1.5 text-xs text-green-800 hover:underline dark:text-green-200">
+                        <lucide-icon [img]="moveIcon" [size]="15" aria-hidden="true" />
+                        Mover</button
+                      ><button
+                        type="button"
+                        (click)="openRemove(member)"
+                        [attr.aria-label]="
+                          'Retirar animal ' + (member.animal_name || member.siniiga)
+                        "
+                        class="inline-flex items-center gap-1.5 text-xs text-red-700 hover:underline dark:text-red-300">
+                        <lucide-icon [img]="removeIcon" [size]="15" aria-hidden="true" /> Retirar
+                      </button>
+                    } @else {
+                      <span class="text-xs text-stone-400">{{
+                        member.end_date ? 'Periodo cerrado' : 'Solo consulta'
+                      }}</span>
+                    }
+                  </div>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="4" class="py-14 text-center text-sm text-stone-500">
+                  {{
+                    current()
+                      ? 'No hay animales actualmente en este lote.'
+                      : 'Este lote aún no tiene movimientos registrados.'
+                  }}
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <div class="mt-5 flex flex-wrap justify-between gap-4 text-xs text-stone-500">
+        <p>{{ total() }} {{ current() ? 'animales' : 'periodos' }} · Página {{ page() + 1 }}</p>
+        <div class="flex gap-3">
+          <button
+            type="button"
+            (click)="changePage(-1)"
+            [disabled]="page() === 0"
+            class="rounded-lg border border-stone-200 px-3 py-2 disabled:opacity-40 dark:border-white/15">
+            Anterior</button
+          ><button
+            type="button"
+            (click)="changePage(1)"
+            [disabled]="(page() + 1) * pageSize >= total()"
+            class="rounded-lg border border-stone-200 px-3 py-2 disabled:opacity-40 dark:border-white/15">
+            Siguiente
+          </button>
+        </div>
+      </div>
+    }
+  }
+</div>
+@if (dialog(); as mode) {
+  <app-modal
+    [title]="
+      mode === 'assign' ? 'Asignar animales' : mode === 'move' ? 'Mover animal' : 'Retirar animal'
+    "
+    [busy]="busy()"
+    (dismiss)="closeDialog()"
+    ><form
+      [formGroup]="movement"
+      (ngSubmit)="saveMovement()"
+      data-testid="movement-form"
+      novalidate>
+      <fieldset [disabled]="busy()" class="min-w-0 space-y-5">
+        @if (mode === 'assign') {
+          <div>
+            <label for="group-animal-search" class="mb-2 block text-xs font-medium"
+              >Buscar animal por nombre o SINIIGA</label
+            >
+            <div class="flex gap-2">
+              <input
+                id="group-animal-search"
+                [formControl]="animalSearch"
+                maxlength="100"
+                class="min-w-0 flex-1 rounded-lg border border-stone-300 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#202020]" /><button
+                type="button"
+                (click)="searchAnimals()"
+                [disabled]="lookupLoading() || animalSearch.invalid"
+                class="rounded-lg border border-stone-200 px-3 text-xs dark:border-white/15">
+                Buscar
+              </button>
+            </div>
+          </div>
+          @if (lookupLoading()) {
+            <p role="status" class="text-xs text-stone-500">Buscando animales…</p>
+          } @else {
+            <div
+              class="modal-scroll max-h-64 overflow-y-auto border-y border-stone-200 dark:border-white/10">
+              @for (animal of options(); track animal.id) {
+                <label
+                  class="flex items-start gap-3 border-b border-stone-100 py-3 last:border-b-0 dark:border-white/5"
+                  [class.opacity-50]="animal.group_id === group()?.id"
+                  ><input
+                    type="checkbox"
+                    [attr.data-option-id]="animal.id"
+                    [checked]="isSelected(animal.id)"
+                    [disabled]="animal.group_id === group()?.id"
+                    (change)="toggle(animal)"
+                    class="mt-1 size-4 shrink-0 accent-green-800" /><span class="min-w-0 text-sm"
+                    >{{ optionLabel(animal)
+                    }}<span class="mt-1 block text-xs text-stone-500">{{
+                      animal.group_id === group()?.id
+                        ? 'Ya está en este lote'
+                        : animal.group_name
+                          ? 'Lote actual: ' + animal.group_name
+                          : 'Sin lote asignado'
+                    }}</span></span
+                  ></label
+                >
+              } @empty {
+                <p class="py-5 text-xs text-stone-500">No hay animales con esa búsqueda.</p>
+              }
+            </div>
+            <p class="text-xs text-stone-500">
+              {{ selected().length }} seleccionados · {{ optionTotal() }} coincidencias. Se muestran
+              hasta 50; afina la búsqueda para localizar otros.
+            </p>
+          }
+          @if (selected().length) {
+            <div class="flex flex-wrap gap-2">
+              @for (animal of selected(); track animal.id) {
+                <button
+                  type="button"
+                  (click)="toggle(animal)"
+                  [attr.aria-label]="'Quitar selección ' + optionLabel(animal)"
+                  class="rounded-md bg-stone-100 px-2 py-1 text-xs dark:bg-white/10">
+                  {{ animal.name || animal.siniiga }} ×
+                </button>
+              }
+            </div>
+          }
+          <label class="flex items-start gap-3 text-sm"
+            ><input
+              type="checkbox"
+              formControlName="move_existing"
+              class="mt-1 size-4 shrink-0 accent-green-800" /><span
+              >Mover también los animales que estén en otros lotes<span
+                class="mt-1 block text-xs leading-5 text-stone-500"
+                >Se cerrará su periodo anterior y se conservará el historial.</span
+              ></span
+            ></label
+          >
+        } @else {
+          <p class="text-sm leading-7">
+            {{ mode === 'move' ? 'Mover' : 'Retirar' }} a
+            <strong class="font-medium">{{ member()?.animal_name || member()?.siniiga }}</strong>
+            del lote {{ group()?.name }}.
+          </p>
+          <p class="text-xs text-stone-500">
+            Ingreso actual: {{ member()?.start_date | date: 'dd/MM/yyyy' : 'UTC' }}.
+          </p>
+        }
+        @if (mode === 'move') {
+          <div>
+            <label for="target-group" class="mb-2 block text-xs font-medium"
+              >Lote de destino *</label
+            ><select
+              id="target-group"
+              formControlName="target_group_id"
+              class="w-full rounded-lg border border-stone-300 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#202020]">
+              <option value="">Selecciona un lote</option>
+              @for (target of targets(); track target.id) {
+                <option [value]="target.id">{{ target.name }}</option>
+              }
+            </select>
+            @if (lookupLoading()) {
+              <p role="status" class="mt-2 text-xs text-stone-500">Cargando lotes…</p>
+            } @else if (!targets().length && !lookupError()) {
+              <p class="mt-2 text-xs text-stone-500">
+                Crea otro lote activo para poder trasladar este animal.
+              </p>
+            }
+            @if (
+              movement.controls.target_group_id.touched && movement.controls.target_group_id.invalid
+            ) {
+              <p class="mt-2 text-xs text-red-700 dark:text-red-300">
+                Selecciona el lote de destino.
+              </p>
+            }
+          </div>
+        }
+        <div>
+          <label for="movement-date" class="mb-2 block text-xs font-medium">Fecha efectiva *</label
+          ><input
+            id="movement-date"
+            formControlName="effective_date"
+            type="date"
+            [max]="today"
+            class="w-full min-w-0 rounded-lg border border-stone-300 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#202020]" />
+          <p class="mt-2 text-xs leading-6 text-stone-500">
+            El cambio entra en vigor al inicio de esta fecha. Si sale de un lote, su último día será
+            el anterior. La fecha debe ser posterior al ingreso actual.
+          </p>
+          @if (
+            movement.controls.effective_date.touched && movement.controls.effective_date.invalid
+          ) {
+            <p class="mt-2 text-xs text-red-700 dark:text-red-300">Ingresa una fecha.</p>
+          }
+        </div>
+      </fieldset>
+      @if (lookupError()) {
+        <p role="alert" class="mt-4 text-xs text-red-700 dark:text-red-300">{{ lookupError() }}</p>
+        <button
+          type="button"
+          (click)="mode === 'assign' ? searchAnimals() : openMove(member()!)"
+          class="mt-2 text-xs underline">
+          Reintentar
+        </button>
+      }
+      @if (formError()) {
+        <p
+          role="alert"
+          class="mt-5 rounded-lg bg-red-50 p-3 text-xs leading-6 text-red-700 dark:bg-red-950/30 dark:text-red-200">
+          {{ formError() }}
+        </p>
+      }
+      <div class="mt-7 flex justify-end gap-3 border-t border-stone-200 pt-5 dark:border-white/10">
+        <button
+          type="button"
+          (click)="closeDialog()"
+          [disabled]="busy()"
+          class="rounded-lg border border-stone-200 px-4 py-3 text-xs dark:border-white/15">
+          Cancelar</button
+        ><button
+          type="submit"
+          [disabled]="busy() || lookupLoading() || !!lookupError()"
+          class="rounded-lg bg-green-900 px-5 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+          {{
+            busy()
+              ? 'Guardando…'
+              : mode === 'assign'
+                ? 'Asignar animales'
+                : mode === 'move'
+                  ? 'Mover animal'
+                  : 'Confirmar retiro'
+          }}
+        </button>
+      </div>
+    </form></app-modal
+  >
+}

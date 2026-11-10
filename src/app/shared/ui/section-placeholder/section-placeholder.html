@@ -1,0 +1,19 @@
+<h1 class="text-2xl font-semibold tracking-tight">{{ data['title'] }}</h1>
+<p class="mt-3 text-sm leading-7 text-stone-500 dark:text-stone-400">{{ data['description'] }}</p>
+<section
+  class="mt-8 rounded-2xl border border-stone-200 bg-white px-6 py-14 text-center dark:border-white/10 dark:bg-[#171717]">
+  <lucide-icon
+    class="inline-flex text-green-600 dark:text-green-400"
+    [img]="icon"
+    [size]="40"
+    aria-hidden="true" />
+  <h2 class="mt-5 text-lg font-medium">Estamos preparando esta sección</h2>
+  <p class="mt-3 text-sm leading-7 text-stone-500 dark:text-stone-400">
+    Aquí podrás gestionar esta área del rancho cuando implementemos sus funciones.
+  </p>
+  <a
+    class="mt-6 inline-block rounded-lg bg-green-50 px-4 py-3 text-xs font-medium text-green-900 transition hover:bg-green-100 dark:bg-white/10 dark:text-green-200 dark:hover:bg-white/15"
+    routerLink="/dashboard/overview"
+    >Volver al resumen</a
+  >
+</section>

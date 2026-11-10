@@ -1,0 +1,874 @@
+<div class="mx-auto max-w-6xl">
+  <div class="flex flex-wrap items-end justify-between gap-5 pb-7">
+    <div>
+      <p class="mb-3 text-xs text-stone-500">Mi rancho / Economía</p>
+      <h1 class="text-2xl font-medium tracking-tight sm:text-3xl">Economía</h1>
+      <p class="mt-3 text-sm text-stone-500">Ingresos, gastos y balance de tu rancho.</p>
+    </div>
+    @if (canWrite()) {
+      <button
+        type="button"
+        data-testid="new-finance"
+        (click)="
+          tab() === 'suppliers'
+            ? openSupplier()
+            : tab() === 'categories'
+              ? openCategory()
+              : openMoney()
+        "
+        [disabled]="loading() || busy()"
+        class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950 inline-flex items-center gap-2">
+        <lucide-icon [img]="plus" [size]="16" />{{
+          tab() === 'suppliers'
+            ? 'Agregar proveedor'
+            : tab() === 'categories'
+              ? 'Agregar categoría'
+              : tab() === 'expenses'
+                ? 'Registrar gasto'
+                : 'Registrar ingreso'
+        }}
+      </button>
+    }
+  </div>
+  @if (success()) {
+    <p
+      role="status"
+      class="mb-5 rounded-lg bg-green-50 p-4 text-sm text-green-900 dark:bg-green-950/30 dark:text-green-200">
+      {{ success() }}
+    </p>
+  }
+  @if (!canRead()) {
+    <p class="py-10 text-sm text-stone-500">No tienes permiso para consultar Economía.</p>
+  } @else {
+    <div class="mb-6 flex flex-wrap gap-5 border-b border-stone-200 text-sm dark:border-white/10">
+      @for (section of ['expenses', 'incomes', 'categories', 'suppliers']; track section) {
+        <button
+          type="button"
+          [attr.data-tab]="section"
+          (click)="switchTab($any(section))"
+          [attr.aria-pressed]="tab() === section"
+          [class.border-green-800]="tab() === section"
+          [class.dark:border-green-300]="tab() === section"
+          [class.border-transparent]="tab() !== section"
+          class="border-b-2 py-3">
+          {{
+            section === 'expenses'
+              ? 'Gastos'
+              : section === 'incomes'
+                ? 'Ingresos'
+                : section === 'categories'
+                  ? 'Categorías'
+                  : 'Proveedores'
+          }}
+        </button>
+      }
+      <a
+        routerLink="/dashboard/finance/costs"
+        class="border-b-2 border-transparent py-3 text-stone-500 hover:text-green-800 dark:hover:text-green-300"
+        >Costos por animal o lote</a
+      >
+      <a routerLink="/dashboard/finance/profitability" class="pb-3 text-stone-500"
+        >Resultado por animal</a
+      >
+    </div>
+    @if (tab() === 'expenses' || tab() === 'incomes') {
+      <form
+        [formGroup]="filters"
+        (ngSubmit)="load()"
+        class="mb-6 flex flex-wrap items-end gap-3"
+        aria-label="Filtrar movimientos">
+        <div class="min-w-0 flex-1 basis-60">
+          <label for="finance-search" class="mb-2 block text-xs">Buscar</label
+          ><input
+            id="finance-search"
+            type="search"
+            formControlName="q"
+            maxlength="100"
+            placeholder="Descripción, proveedor o animal"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]" />
+        </div>
+        <div>
+          <label for="finance-category-filter" class="mb-2 block text-xs">Categoría</label
+          ><select
+            id="finance-category-filter"
+            formControlName="category_id"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+            <option [ngValue]="0">Todas</option>
+            @for (cat of categories()[tab() === 'expenses' ? 'expense' : 'income']; track cat.id) {
+              <option [ngValue]="cat.id">{{ categoryLabel(cat.name) }}</option>
+            }
+          </select>
+        </div>
+        <div class="min-w-0">
+          <label for="finance-from" class="mb-2 block text-xs">Desde</label
+          ><input
+            id="finance-from"
+            type="date"
+            formControlName="date_from"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717] min-w-0" />
+        </div>
+        <div class="min-w-0">
+          <label for="finance-to" class="mb-2 block text-xs">Hasta</label
+          ><input
+            id="finance-to"
+            type="date"
+            formControlName="date_to"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717] min-w-0" />
+        </div>
+        <button
+          type="submit"
+          [disabled]="loading() || filters.invalid"
+          class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+          Filtrar
+        </button>
+      </form>
+      @if (summary(); as totals) {
+        <div
+          data-testid="finance-summary"
+          class="mb-8 border-y border-stone-200 py-5 dark:border-white/10">
+          <div class="grid gap-5 sm:grid-cols-3">
+            <div>
+              <p class="text-xs text-stone-500">Ingresos</p>
+              <p class="mt-2 text-xl font-medium">
+                {{ totals.income_total | currency: 'MXN' : 'symbol' : '1.2-2' }}
+              </p>
+            </div>
+            <div>
+              <p class="text-xs text-stone-500">Gastos</p>
+              <p class="mt-2 text-xl font-medium">
+                {{ totals.expense_total | currency: 'MXN' : 'symbol' : '1.2-2' }}
+              </p>
+            </div>
+            <div>
+              <p class="text-xs text-stone-500">Balance</p>
+              <p class="mt-2 text-xl font-medium">
+                {{ totals.balance | currency: 'MXN' : 'symbol' : '1.2-2' }}
+              </p>
+            </div>
+          </div>
+          <p class="mt-4 text-xs text-stone-500">
+            Totales de todas las categorías para el rango de fechas aplicado. Importes en MXN.
+          </p>
+        </div>
+      }
+    } @else if (tab() === 'suppliers') {
+      <form [formGroup]="filters" (ngSubmit)="load()" class="mb-6 flex flex-wrap items-end gap-3">
+        <div class="min-w-0 flex-1 basis-60">
+          <label for="supplier-search" class="mb-2 block text-xs">Proveedor</label
+          ><input
+            id="supplier-search"
+            type="search"
+            formControlName="q"
+            maxlength="100"
+            placeholder="Nombre, teléfono o correo"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]" />
+        </div>
+        <div>
+          <label for="supplier-filter-active" class="mb-2 block text-xs">Estado</label
+          ><select
+            id="supplier-filter-active"
+            formControlName="active"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+            <option value="">Todos</option>
+            <option value="true">Activos</option>
+            <option value="false">Inactivos</option>
+          </select>
+        </div>
+        <button
+          type="submit"
+          class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950"
+          [disabled]="loading()">
+          Buscar
+        </button>
+      </form>
+    } @else {
+      <div class="mb-6 flex gap-3">
+        @for (kind of ['expense', 'income']; track kind) {
+          <button
+            type="button"
+            [attr.data-category-kind]="kind"
+            (click)="categoryKind.set($any(kind))"
+            [attr.aria-pressed]="categoryKind() === kind"
+            [class.bg-stone-100]="categoryKind() === kind"
+            [class.text-stone-950]="categoryKind() === kind"
+            class="rounded-lg border border-stone-200 px-4 py-3 text-xs dark:border-white/10">
+            {{ kind === 'expense' ? 'Categorías de gastos' : 'Categorías de ingresos' }}
+          </button>
+        }
+      </div>
+    }
+    @if (error()) {
+      <p role="alert" class="mb-4 text-sm text-red-600">{{ error() }}</p>
+      <button type="button" (click)="load()" class="text-sm underline">Reintentar</button>
+    }
+    @if (loading()) {
+      <p role="status" class="py-12 text-sm text-stone-500">Cargando Economía…</p>
+    } @else if (!error()) {
+      @if (tab() === 'expenses' || tab() === 'incomes') {
+        <div class="overflow-x-auto rounded-xl border border-stone-200 dark:border-white/10">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-stone-50 text-xs text-stone-500 dark:bg-white/5">
+              <tr>
+                <th class="p-4 font-normal">Fecha</th>
+                <th class="p-4 font-normal">Categoría / referencia</th>
+                <th class="p-4 font-normal">Descripción</th>
+                <th class="p-4 text-right font-normal">Importe</th>
+                <th class="p-4 text-right font-normal">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (record of moneyPage().items; track record.id) {
+                <tr
+                  [attr.data-money-id]="record.id"
+                  class="border-t border-stone-100 dark:border-white/10">
+                  <td class="whitespace-nowrap p-4">
+                    {{ record.date | date: 'dd/MM/yyyy' : 'UTC' }}
+                  </td>
+                  <td class="p-4">
+                    <p>{{ categoryLabel(record.category.name) }}</p>
+                    <p class="mt-1 text-xs text-stone-500">
+                      {{
+                        record.supplier
+                          ? record.supplier.name
+                          : record.sale
+                            ? saleLabel(record.sale)
+                            : record.animal
+                              ? record.animal.name || record.animal.siniiga || 'Sin identificación'
+                              : 'Sin referencia'
+                      }}
+                    </p>
+                  </td>
+                  <td class="max-w-64 p-4">
+                    <p class="line-clamp-2 break-words text-xs text-stone-500">
+                      {{ record.description || 'Sin descripción' }}
+                    </p>
+                  </td>
+                  <td class="whitespace-nowrap p-4 text-right font-medium">
+                    {{ record.amount | currency: 'MXN' : 'symbol' : '1.2-2' }}
+                    @if (record.sale_pricing; as p) {
+                      <p class="mt-1 text-xs font-normal text-stone-500">
+                        {{ p.weight_kg }} kg ×
+                        {{ p.price_per_kg | currency: 'MXN' : 'symbol' : '1.2-2' }}/kg
+                      </p>
+                    }
+                  </td>
+                  <td class="p-4">
+                    <div class="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        (click)="detail.set(record)"
+                        aria-label="Ver movimiento"
+                        class="rounded-lg p-2 text-stone-500 hover:bg-stone-100 dark:hover:bg-white/5">
+                        <lucide-icon [img]="eye" [size]="17" />
+                      </button>
+                      @if (tab() === 'expenses') {
+                        <button
+                          type="button"
+                          (click)="allocating.set(record)"
+                          [attr.aria-label]="
+                            'Asignación del gasto ' + (record.description || record.id)
+                          "
+                          class="rounded-lg px-3 py-2 text-xs text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-white/5">
+                          {{ record.allocation_count ? 'Asignado' : 'Asignar' }}
+                        </button>
+                      }
+                      @if (canWrite()) {
+                        <button
+                          type="button"
+                          (click)="openMoney(record)"
+                          aria-label="Editar movimiento"
+                          class="rounded-lg p-2 text-stone-500 hover:bg-stone-100 dark:hover:bg-white/5">
+                          <lucide-icon [img]="pencil" [size]="17" />
+                        </button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="5" class="p-12 text-center text-stone-500">
+                    No hay movimientos para estos filtros.
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-stone-500">
+          <p>{{ moneyPage().total }} movimientos</p>
+          <div class="flex gap-3">
+            <button
+              type="button"
+              [disabled]="moneyPage().offset === 0"
+              (click)="load(moneyPage().offset - 25)"
+              class="rounded-lg border border-stone-200 px-3 py-2 disabled:opacity-40 dark:border-white/10">
+              Anterior</button
+            ><button
+              type="button"
+              [disabled]="moneyPage().offset + 25 >= moneyPage().total"
+              (click)="load(moneyPage().offset + 25)"
+              class="rounded-lg border border-stone-200 px-3 py-2 disabled:opacity-40 dark:border-white/10">
+              Siguiente
+            </button>
+          </div>
+        </div>
+      } @else if (tab() === 'suppliers') {
+        <div class="overflow-x-auto rounded-xl border border-stone-200 dark:border-white/10">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-stone-50 text-xs text-stone-500 dark:bg-white/5">
+              <tr>
+                <th class="p-4 font-normal">Proveedor</th>
+                <th class="p-4 font-normal">Contacto</th>
+                <th class="p-4 font-normal">Estado</th>
+                <th class="p-4 text-right font-normal">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (supplier of supplierPage().items; track supplier.id) {
+                <tr
+                  [attr.data-supplier-id]="supplier.id"
+                  class="border-t border-stone-100 dark:border-white/10">
+                  <td class="p-4">
+                    <p class="font-medium">{{ supplier.name }}</p>
+                    <p class="mt-1 max-w-64 break-words text-xs text-stone-500">
+                      {{ supplier.address || 'Sin dirección' }}
+                    </p>
+                  </td>
+                  <td class="p-4">
+                    <p>{{ supplier.phone || 'Sin teléfono' }}</p>
+                    <p class="mt-1 text-xs text-stone-500">{{ supplier.email || 'Sin correo' }}</p>
+                  </td>
+                  <td class="p-4 text-xs">{{ supplier.active ? 'Activo' : 'Inactivo' }}</td>
+                  <td class="p-4 text-right">
+                    @if (canWrite()) {
+                      <button
+                        type="button"
+                        (click)="openSupplier(supplier)"
+                        [attr.aria-label]="'Editar proveedor ' + supplier.name"
+                        class="rounded-lg p-2 text-stone-500 hover:bg-stone-100 dark:hover:bg-white/5">
+                        <lucide-icon [img]="pencil" [size]="17" />
+                      </button>
+                    }
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="4" class="p-12 text-center text-stone-500">
+                    No hay proveedores para estos filtros.
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-stone-500">
+          <p>{{ supplierPage().total }} proveedores</p>
+          <div class="flex gap-3">
+            <button
+              type="button"
+              [disabled]="supplierPage().offset === 0"
+              (click)="load(supplierPage().offset - 25)"
+              class="rounded-lg border border-stone-200 px-3 py-2 disabled:opacity-40 dark:border-white/10">
+              Anterior</button
+            ><button
+              type="button"
+              [disabled]="supplierPage().offset + 25 >= supplierPage().total"
+              (click)="load(supplierPage().offset + 25)"
+              class="rounded-lg border border-stone-200 px-3 py-2 disabled:opacity-40 dark:border-white/10">
+              Siguiente
+            </button>
+          </div>
+        </div>
+      } @else {
+        <div class="overflow-x-auto rounded-xl border border-stone-200 dark:border-white/10">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-stone-50 text-xs text-stone-500 dark:bg-white/5">
+              <tr>
+                <th class="p-4 font-normal">Categoría</th>
+                <th class="p-4 text-right font-normal">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (cat of categories()[categoryKind()]; track cat.id) {
+                <tr
+                  [attr.data-category-id]="cat.id"
+                  class="border-t border-stone-100 dark:border-white/10">
+                  <td class="p-4">{{ categoryLabel(cat.name) }}</td>
+                  <td class="p-4">
+                    @if (canWrite()) {
+                      <div class="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          (click)="openCategory(cat)"
+                          [attr.aria-label]="'Editar categoría ' + categoryLabel(cat.name)"
+                          class="rounded-lg p-2 text-stone-500 hover:bg-stone-100 dark:hover:bg-white/5">
+                          <lucide-icon [img]="pencil" [size]="17" /></button
+                        ><button
+                          type="button"
+                          (click)="askDelete(cat)"
+                          [attr.aria-label]="'Eliminar categoría ' + categoryLabel(cat.name)"
+                          class="rounded-lg p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30">
+                          <lucide-icon [img]="trash" [size]="17" />
+                        </button>
+                      </div>
+                    }
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="2" class="p-12 text-center text-stone-500">
+                    No hay categorías registradas.
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <p class="mt-4 text-xs text-stone-500">
+          Solo se pueden eliminar categorías sin gastos o ingresos asociados.
+        </p>
+      }
+    }
+  }
+</div>
+@if (modal() === 'money') {
+  <app-modal
+    [title]="
+      (editingMoney() ? 'Editar ' : 'Registrar ') + (formKind() === 'expense' ? 'gasto' : 'ingreso')
+    "
+    [busy]="busy()"
+    (dismiss)="closeForm()"
+    ><form [formGroup]="moneyForm" (ngSubmit)="saveMoney()">
+      <fieldset [disabled]="busy()" class="min-w-0 space-y-5">
+        <div>
+          <label for="money-category" class="mb-2 block text-xs">Categoría *</label
+          ><select
+            id="money-category"
+            formControlName="category_id"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+            <option [ngValue]="0">Selecciona una categoría</option>
+            @for (cat of categories()[formKind()]; track cat.id) {
+              <option [ngValue]="cat.id">{{ categoryLabel(cat.name) }}</option>
+            }
+          </select>
+          <p class="mt-2 text-xs text-stone-500">
+            Puedes administrar las categorías en la pestaña Categorías.
+          </p>
+        </div>
+        @if (formKind() === 'income') {
+          <div>
+            <label for="money-pricing" class="mb-2 block text-xs"
+              >Forma de calcular el ingreso</label
+            ><select
+              id="money-pricing"
+              formControlName="pricing_mode"
+              (change)="saleChanged()"
+              class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+              <option value="total">Importe total</option>
+              <option value="per_kg">Venta por kilogramo</option>
+            </select>
+          </div>
+        }
+        <div class="grid gap-4 sm:grid-cols-2">
+          @if (!perKg()) {
+            <div>
+              <label for="money-amount" class="mb-2 block text-xs">Importe (MXN) *</label
+              ><input
+                id="money-amount"
+                type="number"
+                formControlName="amount"
+                [min]="formKind() === 'expense' ? 0.01 : 0"
+                max="9999999999.99"
+                step="0.01"
+                class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717] min-w-0" />
+            </div>
+          }
+          <div>
+            <label for="money-date" class="mb-2 block text-xs">Fecha *</label
+            ><input
+              id="money-date"
+              type="date"
+              formControlName="date"
+              [max]="today"
+              class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717] min-w-0" />
+          </div>
+        </div>
+        <div>
+          <label for="money-option-search" class="mb-2 block text-xs">{{
+            formKind() === 'expense' ? 'Buscar proveedor' : 'Buscar venta por animal'
+          }}</label>
+          <div class="flex gap-2">
+            <input
+              id="money-option-search"
+              type="search"
+              [value]="optionQuery()"
+              (input)="optionQuery.set($any($event.target).value)"
+              maxlength="100"
+              class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717] min-w-0" /><button
+              type="button"
+              (click)="loadOptions()"
+              [disabled]="optionLoading()"
+              class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+              Buscar
+            </button>
+          </div>
+        </div>
+        @if (optionLoading()) {
+          <p role="status" class="text-xs text-stone-500">Cargando opciones…</p>
+        }
+        @if (formKind() === 'expense') {
+          <div>
+            <label for="money-supplier" class="mb-2 block text-xs">Proveedor (opcional)</label
+            ><select
+              id="money-supplier"
+              formControlName="supplier_id"
+              class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+              <option value="">Sin proveedor</option>
+              @for (supplier of supplierOptions(); track supplier.id) {
+                <option [value]="supplier.id">
+                  {{ supplier.name }}{{ supplier.active ? '' : ' (inactivo)' }}
+                </option>
+              }
+            </select>
+            <p class="mt-2 text-xs text-stone-500">
+              Hasta 100 proveedores activos. Puedes agregarlos en Proveedores.
+            </p>
+          </div>
+        } @else {
+          <div>
+            <label for="money-sale" class="mb-2 block text-xs"
+              >Venta de animal {{ perKg() ? '*' : '(opcional)' }}</label
+            ><select
+              id="money-sale"
+              formControlName="exit_event_id"
+              (change)="saleChanged()"
+              class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+              <option value="">Ingreso sin venta vinculada</option>
+              @for (sale of saleOptions(); track sale.id) {
+                <option [value]="sale.id">
+                  {{ saleLabel(sale) }} · {{ sale.date | date: 'dd/MM/yyyy' : 'UTC' }}
+                </option>
+              }
+            </select>
+            <p class="mt-2 text-xs leading-5 text-stone-500">
+              Hasta 100 salidas por venta que todavía no tienen ingreso. La fecha del ingreso debe
+              ser igual o posterior a la venta.
+            </p>
+          </div>
+        }
+        @if (perKg()) {
+          <section class="space-y-4 border-y border-stone-200 py-5 dark:border-white/10">
+            <div>
+              <label for="money-weight" class="mb-2 block text-xs">Pesaje del día de salida *</label
+              ><select
+                id="money-weight"
+                formControlName="weight_event_id"
+                class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+                <option value="">Selecciona un pesaje</option>
+                @for (w of weights(); track w.id) {
+                  <option [value]="w.id">
+                    {{ w.weight_kg }} kg · {{ w.date | date: 'dd/MM/yyyy' : 'UTC' }}
+                  </option>
+                }
+              </select>
+            </div>
+            @if (weightsLoading()) {
+              <p class="text-xs text-stone-500">Consultando pesajes…</p>
+            } @else if (weightsError()) {
+              <p role="alert" class="text-sm text-red-600">
+                {{ weightsError() }}
+                <button type="button" (click)="changePricing(false)" class="underline">
+                  Reintentar
+                </button>
+              </p>
+            } @else if (!weights().length) {
+              <p class="text-xs leading-5 text-stone-500">
+                Selecciona una venta. Si no tiene pesaje de ese día, regístralo en Manejos → Pesajes
+                antes de la salida. Puedes usar Importe total si la venta fue por un monto acordado.
+              </p>
+            }
+            <div>
+              <label for="money-kg-price" class="mb-2 block text-xs"
+                >Precio por kilogramo (MXN) *</label
+              ><input
+                id="money-kg-price"
+                type="number"
+                formControlName="price_per_kg"
+                min="0.01"
+                max="9999999999.99"
+                step="0.01"
+                class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]" />
+            </div>
+            <div class="flex flex-wrap items-baseline justify-between gap-3">
+              <span class="text-xs text-stone-500">Importe calculado · peso × precio por kg</span
+              ><output class="text-xl font-medium">{{
+                preview() === null ? '—' : (preview() | currency: 'MXN' : 'symbol' : '1.2-2')
+              }}</output>
+            </div>
+            <p class="text-xs leading-5 text-stone-500">
+              La API calcula y redondea el total a dos decimales. Guarda el pesaje, los kilogramos
+              usados y el precio de esta venta.
+            </p>
+          </section>
+        }
+        @if (formKind() === 'income' && !moneyForm.controls.exit_event_id.value && !perKg()) {
+          <section class="space-y-4 border-t border-stone-200 pt-4 dark:border-white/10">
+            <button type="button" (click)="toggleIncomeAnimal()" class="text-xs underline">
+              {{
+                directAnimalOpen()
+                  ? 'Quitar vínculo al animal'
+                  : 'Vincular ingreso a un animal (opcional)'
+              }}
+            </button>
+            @if (directAnimalOpen()) {
+              <div>
+                <label for="income-animal-search" class="mb-2 block text-xs">Buscar animal</label>
+                <div class="flex gap-2">
+                  <input
+                    id="income-animal-search"
+                    [value]="animalQuery()"
+                    (input)="animalQuery.set($any($event.target).value)"
+                    (keydown.enter)="$event.preventDefault(); findIncomeAnimals()"
+                    maxlength="100"
+                    class="min-w-0 w-full rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" /><button
+                    type="button"
+                    (click)="findIncomeAnimals()"
+                    [disabled]="animalLoading()"
+                    class="rounded-lg border border-stone-200 px-3 py-2 text-xs dark:border-white/15">
+                    Buscar
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label for="income-animal" class="mb-2 block text-xs"
+                  >Animal al que corresponde</label
+                ><select
+                  id="income-animal"
+                  formControlName="animal_id"
+                  class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+                  <option value="">Sin animal vinculado</option>
+                  @for (a of incomeAnimals(); track a.id) {
+                    <option [value]="a.id">
+                      {{ a.name || 'Sin nombre' }} · {{ a.siniiga || 'Sin SINIIGA' }}
+                    </option>
+                  }
+                </select>
+              </div>
+              <p class="text-xs leading-5 text-stone-500">
+                El importe completo se atribuye a este animal. Los ingresos vinculados a una venta
+                toman al animal de esa salida.
+              </p>
+              @if (animalLoading()) {
+                <p class="text-xs text-stone-500">Buscando animales…</p>
+              }
+              @if (animalError()) {
+                <p role="alert" class="text-sm text-red-600">{{ animalError() }}</p>
+              }
+            }
+          </section>
+        }
+        <div>
+          <label for="money-description" class="mb-2 block text-xs">Descripción</label
+          ><textarea
+            id="money-description"
+            formControlName="description"
+            rows="3"
+            maxlength="5000"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]"></textarea>
+        </div>
+        @if (moneyForm.invalid && moneyForm.touched) {
+          <p role="alert" class="text-sm text-red-600">
+            Completa categoría y fecha, e importe o pesaje y precio por kilogramo con hasta dos
+            decimales.
+          </p>
+        }
+        @if (formError()) {
+          <p role="alert" class="text-sm text-red-600">{{ formError() }}</p>
+        }
+        <div class="flex justify-end gap-3 border-t border-stone-200 pt-5 dark:border-white/10">
+          <button type="button" (click)="closeForm()" class="px-4 py-3 text-xs">Cancelar</button
+          ><button
+            type="submit"
+            [disabled]="!optionReady()"
+            class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+            {{ busy() ? 'Guardando…' : 'Guardar movimiento' }}
+          </button>
+        </div>
+      </fieldset>
+    </form></app-modal
+  >
+}
+@if (modal() === 'supplier') {
+  <app-modal
+    [title]="editingSupplier() ? 'Editar proveedor' : 'Agregar proveedor'"
+    [busy]="busy()"
+    (dismiss)="closeForm()"
+    ><form [formGroup]="supplierForm" (ngSubmit)="saveSupplier()">
+      <fieldset [disabled]="busy()" class="min-w-0 space-y-5">
+        <div>
+          <label for="supplier-name" class="mb-2 block text-xs">Nombre *</label
+          ><input
+            id="supplier-name"
+            formControlName="name"
+            maxlength="150"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]" />
+        </div>
+        <div>
+          <label for="supplier-phone" class="mb-2 block text-xs">Teléfono</label
+          ><input
+            id="supplier-phone"
+            type="tel"
+            formControlName="phone"
+            maxlength="30"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]" />
+        </div>
+        <div>
+          <label for="supplier-email" class="mb-2 block text-xs">Correo</label
+          ><input
+            id="supplier-email"
+            type="email"
+            formControlName="email"
+            maxlength="190"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]" />
+        </div>
+        <div>
+          <label for="supplier-address" class="mb-2 block text-xs">Dirección</label
+          ><textarea
+            id="supplier-address"
+            formControlName="address"
+            rows="3"
+            maxlength="5000"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]"></textarea>
+        </div>
+        <label class="flex items-center gap-3 text-sm"
+          ><input
+            id="supplier-active"
+            type="checkbox"
+            formControlName="active"
+            class="accent-green-900" />Proveedor activo</label
+        >
+        <p class="text-xs leading-5 text-stone-500">
+          Desactivar conserva sus gastos e impide seleccionarlo para nuevos registros.
+        </p>
+        @if (supplierForm.invalid && supplierForm.touched) {
+          <p role="alert" class="text-sm text-red-600">Indica el nombre y revisa el correo.</p>
+        }
+        @if (formError()) {
+          <p role="alert" class="text-sm text-red-600">{{ formError() }}</p>
+        }
+        <div class="flex justify-end gap-3 border-t border-stone-200 pt-5 dark:border-white/10">
+          <button type="button" (click)="closeForm()" class="px-4 py-3 text-xs">Cancelar</button
+          ><button
+            type="submit"
+            class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+            {{ busy() ? 'Guardando…' : 'Guardar proveedor' }}
+          </button>
+        </div>
+      </fieldset>
+    </form></app-modal
+  >
+}
+@if (modal() === 'category') {
+  <app-modal
+    [title]="
+      (editingCategory() ? 'Editar categoría de ' : 'Agregar categoría de ') +
+      (formKind() === 'expense' ? 'gastos' : 'ingresos')
+    "
+    [busy]="busy()"
+    (dismiss)="closeForm()"
+    ><form (submit)="$event.preventDefault(); saveCategory()">
+      <fieldset [disabled]="busy()" class="min-w-0 space-y-5">
+        <div>
+          <label for="category-name" class="mb-2 block text-xs">Nombre *</label
+          ><input
+            id="category-name"
+            [formControl]="categoryName"
+            maxlength="80"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]" />
+        </div>
+        @if (categoryName.invalid && categoryName.touched) {
+          <p role="alert" class="text-sm text-red-600">Indica el nombre de la categoría.</p>
+        }
+        @if (formError()) {
+          <p role="alert" class="text-sm text-red-600">{{ formError() }}</p>
+        }
+        <div class="flex justify-end gap-3 border-t border-stone-200 pt-5 dark:border-white/10">
+          <button type="button" (click)="closeForm()" class="px-4 py-3 text-xs">Cancelar</button
+          ><button
+            type="submit"
+            class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+            {{ busy() ? 'Guardando…' : 'Guardar categoría' }}
+          </button>
+        </div>
+      </fieldset>
+    </form></app-modal
+  >
+}
+@if (deletingCategory(); as category) {
+  <app-modal title="Eliminar categoría" [busy]="busy()" (dismiss)="deletingCategory.set(null)"
+    ><p class="text-sm leading-6">
+      ¿Eliminar {{ categoryLabel(category.name) }}? Solo se elimina si no tiene movimientos
+      asociados.
+    </p>
+    @if (formError()) {
+      <p role="alert" class="mt-4 text-sm text-red-600">{{ formError() }}</p>
+    }
+    <div class="mt-6 flex justify-end gap-3">
+      <button
+        type="button"
+        [disabled]="busy()"
+        (click)="deletingCategory.set(null)"
+        class="px-4 py-3 text-xs">
+        Cancelar</button
+      ><button
+        type="button"
+        data-testid="confirm-category-delete"
+        [disabled]="busy()"
+        (click)="deleteCategory()"
+        class="rounded-lg bg-red-700 px-4 py-3 text-xs text-white">
+        {{ busy() ? 'Eliminando…' : 'Eliminar categoría' }}
+      </button>
+    </div></app-modal
+  >
+}
+@if (detail(); as record) {
+  <app-modal title="Detalle del movimiento" (dismiss)="detail.set(null)"
+    ><p class="text-2xl font-medium">{{ record.amount | currency: 'MXN' : 'symbol' : '1.2-2' }}</p>
+    <p class="mt-2 text-sm text-stone-500">
+      {{ categoryLabel(record.category.name) }} · {{ record.date | date: 'dd/MM/yyyy' : 'UTC' }}
+    </p>
+    @if (record.supplier) {
+      <p class="mt-6 text-sm">Proveedor: {{ record.supplier.name }}</p>
+    }
+    @if (record.animal && !record.sale) {
+      <p class="mt-6 text-sm">
+        Animal vinculado: {{ record.animal.name || record.animal.siniiga || 'Sin identificación' }}
+      </p>
+    }
+    @if (record.sale) {
+      <p class="mt-6 text-sm">Venta de {{ saleLabel(record.sale) }}</p>
+      <p class="mt-2 text-xs text-stone-500">
+        Salida registrada el {{ record.sale.date | date: 'dd/MM/yyyy' : 'UTC' }}
+      </p>
+    }
+    @if (record.sale_pricing; as p) {
+      <div class="mt-6 border-y border-stone-200 py-4 dark:border-white/10">
+        <p class="text-xs text-stone-500">Venta por kilogramo · datos guardados</p>
+        <p class="mt-2 text-sm">
+          {{ p.weight_kg }} kg × {{ p.price_per_kg | currency: 'MXN' : 'symbol' : '1.2-2' }} / kg
+        </p>
+        <p class="mt-2 text-xs text-stone-500">Pesaje vinculado al día de la salida.</p>
+      </div>
+    }
+    <p class="mt-6 break-words whitespace-pre-wrap text-sm leading-6">
+      {{ record.description || 'Sin descripción' }}
+    </p></app-modal
+  >
+}
+
+@if (allocating(); as expense) {
+  <app-allocation-editor
+    [expense]="expense"
+    (dismiss)="allocating.set(null)"
+    (saved)="allocationSaved()" />
+}

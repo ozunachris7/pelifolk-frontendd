@@ -1,0 +1,436 @@
+@if (!canRead()) {
+  <p class="p-8 text-sm text-stone-500">No tienes permiso para consultar sanidad.</p>
+} @else {
+  <header class="mb-6 flex flex-wrap items-start justify-between gap-4">
+    <div>
+      <p class="text-xs uppercase tracking-widest text-stone-500">Sanidad</p>
+      <h1 class="mt-2 text-2xl font-medium tracking-tight">Alergias y reacciones</h1>
+      <p class="mt-3 max-w-2xl text-sm leading-6 text-stone-500">
+        Registra lo observado y el agente sospechado, aunque aún no se conozca la causa. Vincular un
+        producto o dosis no confirma que haya causado la reacción.
+      </p>
+    </div>
+    @if (canWrite()) {
+      <button
+        type="button"
+        (click)="start()"
+        data-new-reaction
+        class="inline-flex items-center gap-2 rounded-lg bg-green-900 px-4 py-3 text-sm font-medium text-white dark:bg-stone-100 dark:text-stone-950">
+        <lucide-icon [img]="plus" [size]="16" />Registrar reporte
+      </button>
+    }
+  </header>
+  <app-health-nav />
+  <form (submit)="$event.preventDefault(); load()" class="mb-6 flex flex-wrap items-end gap-3">
+    <div class="min-w-0 flex-1">
+      <label for="reaction-search" class="mb-2 block text-xs">Buscar animal</label
+      ><input
+        id="reaction-search"
+        [value]="search()"
+        (input)="search.set($any($event.target).value)"
+        maxlength="100"
+        class="w-full rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+    </div>
+    <div>
+      <label for="reaction-status" class="mb-2 block text-xs">Seguimiento</label
+      ><select
+        id="reaction-status"
+        [value]="status()"
+        (change)="status.set($any($event.target).value)"
+        class="rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+        <option value="">Todos</option>
+        <option value="open">Abierto</option>
+        <option value="closed">Cerrado</option>
+      </select>
+    </div>
+    <button
+      type="submit"
+      class="rounded-lg bg-green-900 px-4 py-3 text-sm font-medium text-white dark:bg-stone-100 dark:text-stone-950">
+      Buscar
+    </button>
+    @if (animalFilter()) {
+      <button
+        type="button"
+        (click)="animalFilter.set(''); load()"
+        class="px-2 py-3 text-xs underline">
+        Quitar filtro de animal
+      </button>
+    }
+  </form>
+  @if (success()) {
+    <p role="status" class="mb-4 text-sm">{{ success() }}</p>
+  }
+  @if (error()) {
+    <p role="alert" class="mb-4 text-sm text-red-700 dark:text-red-300">
+      {{ error() }} <button type="button" (click)="load()" class="underline">Reintentar</button>
+    </p>
+  }
+  @if (loading()) {
+    <p role="status" class="py-10 text-sm text-stone-500">Cargando reportes…</p>
+  } @else {
+    <div class="overflow-x-auto rounded-xl border border-stone-200 dark:border-white/10">
+      <table class="w-full text-left text-sm">
+        <thead class="border-b border-stone-200 text-xs text-stone-500 dark:border-white/10">
+          <tr>
+            <th class="p-4">Animal</th>
+            <th class="p-4">Fecha y reporte</th>
+            <th class="p-4">Producto / agente sospechado</th>
+            <th class="p-4">Seguimiento</th>
+            <th class="p-4"><span class="sr-only">Acciones</span></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-stone-200 dark:divide-white/10">
+          @for (r of page().items; track r.id) {
+            <tr data-reaction-row>
+              <td class="p-4">
+                <p class="font-medium">{{ label(r.animal) }}</p>
+              </td>
+              <td class="p-4">
+                <p class="whitespace-nowrap text-xs text-stone-500">
+                  {{ r.date | date: 'dd/MM/yyyy' : 'UTC' }}
+                </p>
+                <p class="mt-2 whitespace-nowrap">{{ kind(r.kind) }}</p>
+                <p class="mt-2 line-clamp-2 max-w-xs break-words text-xs text-stone-500">
+                  {{ r.description }}
+                </p>
+              </td>
+              <td class="p-4">
+                <p>{{ r.product_name || r.suspected_agent || 'Sin identificar' }}</p>
+                @if (r.product_name && r.suspected_agent) {
+                  <p class="mt-2 text-xs text-stone-500">{{ r.suspected_agent }}</p>
+                }
+                @if (r.dose) {
+                  <p class="mt-2 text-xs text-stone-500">Dosis vinculada</p>
+                }
+              </td>
+              <td class="whitespace-nowrap p-4 text-xs">
+                {{ r.status === 'open' ? 'Abierto' : 'Cerrado' }}
+              </td>
+              <td class="p-4">
+                <button
+                  type="button"
+                  (click)="view(r)"
+                  class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-stone-200 px-3 py-2 text-xs dark:border-white/15">
+                  <lucide-icon [img]="eye" [size]="15" />Ver reporte
+                </button>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="5" class="p-8 text-center text-sm text-stone-500">
+                No hay reportes para estos filtros.
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    @if (page().total > page().limit) {
+      <div class="mt-5 flex flex-wrap justify-end gap-4 text-xs">
+        <span
+          >{{ page().offset + 1 }}–{{ page().offset + page().items.length }} de
+          {{ page().total }}</span
+        ><button
+          type="button"
+          [disabled]="page().offset === 0"
+          (click)="load(page().offset - page().limit)"
+          class="disabled:opacity-40">
+          Anterior</button
+        ><button
+          type="button"
+          [disabled]="page().offset + page().limit >= page().total"
+          (click)="load(page().offset + page().limit)"
+          class="disabled:opacity-40">
+          Siguiente
+        </button>
+      </div>
+    }
+  }
+  <p class="mt-5 text-xs leading-5 text-stone-500">
+    Los reportes conservan sus datos originales. Cerrar el seguimiento no elimina el antecedente ni
+    confirma que una alergia haya desaparecido.
+  </p>
+}
+@if (formOpen()) {
+  <app-modal title="Registrar alergia o reacción" [busy]="busy()" (dismiss)="dismiss()">
+    <form [formGroup]="form" (ngSubmit)="save()" class="space-y-5">
+      <fieldset [disabled]="busy()" class="min-w-0 space-y-5">
+        <div>
+          <label for="reaction-animal-search" class="mb-2 block text-xs"
+            >Buscar animal por nombre o SINIIGA</label
+          >
+          <div class="flex gap-2">
+            <input
+              id="reaction-animal-search"
+              [value]="animalSearch()"
+              (input)="animalSearch.set($any($event.target).value)"
+              maxlength="100"
+              class="min-w-0 flex-1 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" /><button
+              type="button"
+              (click)="findAnimals()"
+              [disabled]="animalLoading()"
+              class="rounded-lg border border-stone-200 px-3 text-xs dark:border-white/15">
+              Buscar
+            </button>
+          </div>
+        </div>
+        <div>
+          <label for="reaction-animal" class="mb-2 block text-xs">Animal *</label
+          ><select
+            id="reaction-animal"
+            formControlName="animal_id"
+            (change)="sourceChanged()"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+            <option value="">Selecciona el animal</option>
+            @for (a of animals(); track a.id) {
+              <option [value]="a.id">{{ label(a) }}</option>
+            }
+          </select>
+          @if (animalLoading()) {
+            <p role="status" class="mt-2 text-xs text-stone-500">Cargando animales…</p>
+          }
+        </div>
+        <div class="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label for="reaction-date" class="mb-2 block text-xs">Fecha del hallazgo *</label
+            ><input
+              id="reaction-date"
+              type="date"
+              formControlName="date"
+              [max]="today"
+              class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+          </div>
+          <div>
+            <label for="reaction-kind" class="mb-2 block text-xs">Tipo de reporte *</label
+            ><select
+              id="reaction-kind"
+              formControlName="kind"
+              class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+              <option value="adverse_reaction">Reacción adversa observada</option>
+              <option value="suspected_allergy">Sospecha de alergia</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label for="reaction-description" class="mb-2 block text-xs">¿Qué se observó? *</label
+          ><textarea
+            id="reaction-description"
+            formControlName="description"
+            rows="4"
+            maxlength="5000"
+            class="w-full rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15"></textarea>
+        </div>
+        <div>
+          <label for="reaction-agent" class="mb-2 block text-xs">Agente sospechado (opcional)</label
+          ><input
+            id="reaction-agent"
+            formControlName="suspected_agent"
+            maxlength="190"
+            class="w-full rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+          <p class="mt-2 text-xs leading-5 text-stone-500">
+            Por ejemplo, un alimento o sustancia. Si no se conoce, déjalo vacío.
+          </p>
+        </div>
+        <div class="border-t border-stone-200 pt-4 dark:border-white/10">
+          <label for="reaction-product-search" class="mb-2 block text-xs"
+            >Buscar producto relacionado (opcional)</label
+          >
+          <div class="flex gap-2">
+            <input
+              id="reaction-product-search"
+              [value]="productSearch()"
+              (input)="productSearch.set($any($event.target).value)"
+              maxlength="150"
+              class="min-w-0 flex-1 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" /><button
+              type="button"
+              (click)="findProducts()"
+              [disabled]="productLoading()"
+              class="rounded-lg border border-stone-200 px-3 text-xs dark:border-white/15">
+              Buscar
+            </button>
+          </div>
+        </div>
+        <div>
+          <label for="reaction-product" class="mb-2 block text-xs">Producto relacionado</label
+          ><select
+            id="reaction-product"
+            formControlName="product_id"
+            (change)="sourceChanged()"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+            <option value="">Sin producto identificado</option>
+            @for (p of products(); track p.id) {
+              <option [value]="p.id">{{ p.name }}{{ p.active ? '' : ' · Inactivo' }}</option>
+            }
+          </select>
+          <p class="mt-2 text-xs text-stone-500">
+            Se incluyen productos inactivos para conservar antecedentes históricos.
+          </p>
+        </div>
+        @if (form.controls.animal_id.value) {
+          <div>
+            <label for="reaction-dose" class="mb-2 block text-xs"
+              >Dosis aplicada relacionada (opcional)</label
+            ><select
+              id="reaction-dose"
+              formControlName="dose_id"
+              [attr.aria-busy]="doseLoading()"
+              class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+              <option value="">Sin dosis vinculada</option>
+              @for (d of doses().items; track d.id) {
+                <option [value]="d.id">
+                  {{ d.product_name }} · {{ applied(d.applied_at) }} · {{ d.dose_value }}
+                  {{ d.dose_unit_code }}
+                </option>
+              }
+            </select>
+            @if (doseLoading()) {
+              <p role="status" class="mt-2 text-xs text-stone-500">Cargando dosis…</p>
+            } @else {
+              <p class="mt-2 text-xs leading-5 text-stone-500">
+                Solo aparecen aplicaciones registradas de este animal. Si eliges una dosis, su
+                producto quedará vinculado automáticamente.
+              </p>
+            }
+            @if (doses().total > doses().limit) {
+              <div class="mt-3 flex flex-wrap gap-4 text-xs">
+                <span
+                  >{{ doses().offset + 1 }}–{{ doses().offset + doses().items.length }} de
+                  {{ doses().total }}</span
+                ><button
+                  type="button"
+                  (click)="dosePage(doses().offset - doses().limit)"
+                  [disabled]="doseLoading() || doses().offset === 0"
+                  class="underline disabled:opacity-40">
+                  Anteriores</button
+                ><button
+                  type="button"
+                  (click)="dosePage(doses().offset + doses().limit)"
+                  [disabled]="doseLoading() || doses().offset + doses().limit >= doses().total"
+                  class="underline disabled:opacity-40">
+                  Siguientes
+                </button>
+              </div>
+            }
+          </div>
+        }
+        @if (optionError()) {
+          <p role="alert" class="text-xs text-red-700 dark:text-red-300">
+            {{ optionError() }} Usa Buscar para volver a consultar las opciones.
+          </p>
+        }
+        <div class="flex justify-end gap-3">
+          <button
+            type="button"
+            (click)="dismiss()"
+            class="rounded-lg border border-stone-200 px-4 py-3 text-sm dark:border-white/15">
+            Cancelar</button
+          ><button
+            type="submit"
+            class="rounded-lg bg-green-900 px-4 py-3 text-sm font-medium text-white dark:bg-stone-100 dark:text-stone-950">
+            {{ busy() ? 'Guardando…' : 'Guardar reporte' }}
+          </button>
+        </div>
+      </fieldset>
+      @if (formError()) {
+        <p role="alert" class="text-sm text-red-700 dark:text-red-300">{{ formError() }}</p>
+      }
+    </form>
+  </app-modal>
+}
+@if (detail(); as r) {
+  <app-modal title="Detalle del reporte" [busy]="busy()" (dismiss)="!busy() && detail.set(null)">
+    <p class="text-lg font-medium">{{ label(r.animal) }}</p>
+    <p class="mt-3 text-sm">{{ kind(r.kind) }}</p>
+    <p class="mt-2 text-xs text-stone-500">
+      {{ r.date | date: 'dd/MM/yyyy' : 'UTC' }} · {{ r.recorded_by }}
+    </p>
+    <p class="my-5 whitespace-pre-wrap break-words text-sm leading-6">{{ r.description }}</p>
+    <dl class="space-y-3 border-y border-stone-200 py-4 text-sm dark:border-white/10">
+      <div>
+        <dt class="text-xs text-stone-500">Agente sospechado</dt>
+        <dd class="mt-1 break-words">{{ r.suspected_agent || 'Sin identificar' }}</dd>
+      </div>
+      <div>
+        <dt class="text-xs text-stone-500">Producto relacionado</dt>
+        <dd class="mt-1">{{ r.product_name || 'Sin producto vinculado' }}</dd>
+      </div>
+      @if (r.dose; as d) {
+        <div>
+          <dt class="text-xs text-stone-500">Dosis aplicada vinculada</dt>
+          <dd class="mt-1 break-words">
+            {{ applied(d.applied_at) }}<br />{{ d.dose_value }} {{ d.dose_unit_code }} ·
+            {{ d.route_name }}<br />Aplicada por {{ d.administered_by }}
+          </dd>
+        </div>
+      }
+    </dl>
+    <p class="mt-4 text-xs text-stone-500">
+      La relación registrada no confirma la causa de la reacción.
+    </p>
+    @if (r.status === 'closed') {
+      <section class="mt-6">
+        <h3 class="text-sm font-medium">Seguimiento cerrado</h3>
+        <p class="mt-2 text-xs text-stone-500">
+          {{ r.closed_date | date: 'dd/MM/yyyy' : 'UTC' }} · {{ r.closed_by }}
+        </p>
+        <p class="mt-3 whitespace-pre-wrap break-words text-sm">{{ r.closure_notes }}</p>
+        <p class="mt-3 text-xs text-stone-500">
+          El cierre no descarta una alergia. El antecedente permanece visible.
+        </p>
+      </section>
+    } @else if (canWrite()) {
+      @if (!closing()) {
+        <button
+          type="button"
+          (click)="closing.set(true)"
+          class="mt-6 inline-flex items-center gap-2 rounded-lg border border-stone-200 px-4 py-3 text-sm dark:border-white/15">
+          <lucide-icon [img]="check" [size]="16" />Cerrar seguimiento
+        </button>
+      } @else {
+        <form [formGroup]="closureForm" (ngSubmit)="closeFollowup()" class="mt-6 space-y-4">
+          <fieldset [disabled]="busy()" class="space-y-4">
+            <div>
+              <label for="reaction-close-date" class="mb-2 block text-xs">Fecha de cierre *</label
+              ><input
+                id="reaction-close-date"
+                type="date"
+                formControlName="date"
+                [min]="r.date"
+                [max]="today"
+                class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+            </div>
+            <div>
+              <label for="reaction-close-notes" class="mb-2 block text-xs"
+                >Motivo y resultado del seguimiento *</label
+              ><textarea
+                id="reaction-close-notes"
+                formControlName="notes"
+                rows="3"
+                maxlength="5000"
+                class="w-full rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15"></textarea>
+            </div>
+            <p class="text-xs leading-5 text-stone-500">
+              El reporte original se conserva. Cerrar el seguimiento no confirma que una alergia
+              haya desaparecido.
+            </p>
+            <div class="flex justify-end gap-3">
+              <button
+                type="button"
+                (click)="closing.set(false)"
+                class="rounded-lg border border-stone-200 px-3 py-3 text-sm dark:border-white/15">
+                Cancelar</button
+              ><button
+                type="submit"
+                class="rounded-lg bg-green-900 px-4 py-3 text-sm font-medium text-white dark:bg-stone-100 dark:text-stone-950">
+                {{ busy() ? 'Guardando…' : 'Guardar cierre' }}
+              </button>
+            </div>
+          </fieldset>
+        </form>
+      }
+    }
+    @if (formError()) {
+      <p role="alert" class="mt-4 text-sm text-red-700 dark:text-red-300">{{ formError() }}</p>
+    }
+  </app-modal>
+}

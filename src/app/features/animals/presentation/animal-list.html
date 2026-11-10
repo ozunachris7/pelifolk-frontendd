@@ -1,0 +1,607 @@
+@if (!detail()) {
+  <div class="mx-auto max-w-6xl">
+    <div class="flex flex-wrap items-end justify-between gap-5 pb-7">
+      <div>
+        <p class="mb-3 text-xs text-stone-500 dark:text-stone-400">Mi rancho / Hato</p>
+        <h1 class="text-2xl font-medium tracking-tight sm:text-3xl">Animales</h1>
+        <p class="mt-3 text-sm leading-6 text-stone-500 dark:text-stone-400">
+          Identificación, razas y parentesco de tu hato.
+        </p>
+      </div>
+      @if (canWrite()) {
+        <button
+          type="button"
+          data-testid="new-animal"
+          (click)="openForm()"
+          [disabled]="busy()"
+          class="inline-flex items-center gap-2 rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white hover:bg-green-800 disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+          <lucide-icon [img]="plusIcon" [size]="16" aria-hidden="true" /> Registrar animal
+        </button>
+      }
+    </div>
+    <nav
+      aria-label="Gestión del hato"
+      class="mb-7 flex flex-wrap gap-7 border-b border-stone-200 text-sm dark:border-white/10">
+      <a
+        routerLink="/dashboard/animals"
+        aria-current="page"
+        class="border-b-2 border-green-800 pb-4 font-medium text-green-900 dark:border-green-200 dark:text-green-200"
+        >Animales</a
+      >
+      <a
+        routerLink="/dashboard/breeds"
+        class="pb-4 text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-white"
+        >Razas</a
+      >
+      <a
+        routerLink="/dashboard/physical-evaluations"
+        class="pb-4 text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-white"
+        >Evaluaciones físicas</a
+      >
+      <a routerLink="/dashboard/management-decisions" class="pb-4 text-stone-500"
+        >Decisiones vigentes</a
+      >
+    </nav>
+    @if (success()) {
+      <div
+        role="status"
+        class="mb-5 flex justify-between gap-4 rounded-lg bg-green-50 p-4 text-sm text-green-900 dark:bg-green-950/30 dark:text-green-200">
+        <p>{{ success() }}</p>
+        <button type="button" aria-label="Cerrar mensaje" (click)="success.set('')">×</button>
+      </div>
+    }
+    @if (!canRead()) {
+      <p class="py-10 text-sm text-stone-500">No tienes permiso para consultar animales.</p>
+    } @else {
+      <form
+        [formGroup]="search"
+        (ngSubmit)="load(true)"
+        class="mb-6 flex flex-wrap items-end gap-3"
+        aria-label="Buscar animales">
+        <div class="min-w-0 flex-1 basis-60">
+          <label for="animal-search" class="mb-2 block text-xs font-medium">Nombre o SINIIGA</label
+          ><input
+            id="animal-search"
+            formControlName="q"
+            type="search"
+            maxlength="100"
+            placeholder="Buscar en el hato"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm outline-none focus:border-green-700 dark:border-white/15 dark:bg-[#171717]" />
+        </div>
+        <div>
+          <label for="animal-filter-sex" class="mb-2 block text-xs font-medium">Sexo</label
+          ><select
+            id="animal-filter-sex"
+            formControlName="sex"
+            class="rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+            <option value="">Todos</option>
+            <option value="female">Hembras</option>
+            <option value="male">Machos</option>
+          </select>
+        </div>
+        <div>
+          <label for="animal-filter-active" class="mb-2 block text-xs font-medium">Estado</label
+          ><select
+            id="animal-filter-active"
+            formControlName="active"
+            class="rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+            <option value="true">Activos</option>
+            <option value="false">Bajas</option>
+            <option value="">Todos</option>
+          </select>
+        </div>
+        <button
+          type="submit"
+          [disabled]="loading() || search.invalid"
+          class="inline-flex items-center gap-2 rounded-lg border border-stone-200 px-4 py-3 text-sm disabled:opacity-50 dark:border-white/15">
+          <lucide-icon [img]="searchIcon" [size]="16" aria-hidden="true" /> Buscar
+        </button>
+      </form>
+      @if (error()) {
+        <div
+          role="alert"
+          class="mb-5 rounded-lg bg-red-50 p-4 text-sm text-red-800 dark:bg-red-950/25 dark:text-red-200">
+          {{ error() }}
+          <button type="button" (click)="load()" class="ml-2 underline">Reintentar</button>
+        </div>
+      }
+      @if (loading()) {
+        <p role="status" class="py-12 text-center text-sm text-stone-500">Cargando animales…</p>
+      } @else if (!error()) {
+        <div class="overflow-x-auto border-y border-stone-200 dark:border-white/10">
+          <table class="w-full min-w-[680px] text-left text-sm">
+            <thead
+              class="border-b border-stone-200 text-xs text-stone-500 dark:border-white/10 dark:text-stone-400">
+              <tr>
+                <th scope="col" class="py-4 pr-5 font-medium">Animal</th>
+                <th scope="col" class="px-4 py-4 font-medium">Sexo / nacimiento</th>
+                <th scope="col" class="px-4 py-4 font-medium">Razas</th>
+                <th scope="col" class="py-4 pl-4 text-right font-medium">Acciones</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-stone-200 dark:divide-white/10">
+              @for (animal of animals(); track animal.id) {
+                <tr
+                  [attr.data-animal-id]="animal.id"
+                  class="hover:bg-stone-50 dark:hover:bg-white/[0.025]">
+                  <th scope="row" class="py-5 pr-5 align-top font-normal">
+                    <span class="font-medium">{{ animal.name || 'Sin nombre' }}</span
+                    ><span class="mt-1 block text-xs text-stone-500">{{
+                      animal.siniiga || 'SINIIGA pendiente'
+                    }}</span>
+                    @if (animal.is_breeder) {
+                      <span class="mt-2 block text-xs text-green-800 dark:text-green-200"
+                        >Reproductor</span
+                      >
+                    }
+                    <p
+                      class="mt-2 text-xs text-stone-500"
+                      [attr.data-animal-status]="animal.status || 'active'">
+                      {{ statusLabel(animal.status || 'active') }}
+                    </p>
+                  </th>
+                  <td class="px-4 py-5 align-top text-xs">
+                    {{ sexLabel(animal.sex)
+                    }}<span class="mt-1 block text-stone-500">{{
+                      animal.birth_date
+                        ? (animal.birth_date | date: 'dd/MM/yyyy' : 'UTC')
+                        : 'Fecha desconocida'
+                    }}</span>
+                  </td>
+                  <td
+                    class="px-4 py-5 align-top text-xs leading-6 text-stone-600 dark:text-stone-300">
+                    @for (share of animal.breeds; track share.breed_id) {
+                      <span class="block">{{ share.name }} · {{ share.percentage }} %</span>
+                    } @empty {
+                      <span class="text-stone-400">Sin registrar</span>
+                    }
+                  </td>
+                  <td class="py-5 pl-4 align-top">
+                    <div class="flex justify-end gap-4">
+                      <button
+                        type="button"
+                        (click)="showDetail(animal)"
+                        [attr.aria-label]="'Ver ficha de ' + (animal.name || animal.siniiga)"
+                        class="inline-flex items-center gap-1.5 text-xs text-stone-600 hover:underline dark:text-stone-300">
+                        <lucide-icon [img]="viewIcon" [size]="15" aria-hidden="true" />
+                        Ficha
+                      </button>
+                      <a
+                        [routerLink]="['/dashboard/genealogy', animal.id]"
+                        [attr.aria-label]="'Ver genealogía de ' + (animal.name || animal.siniiga)"
+                        class="inline-flex items-center gap-1.5 text-xs text-stone-600 hover:underline dark:text-stone-300"
+                        ><lucide-icon
+                          [img]="familyIcon"
+                          [size]="15"
+                          aria-hidden="true" />Genealogía</a
+                      >
+                      @if (canWrite()) {
+                        <button
+                          type="button"
+                          (click)="openForm(animal)"
+                          [attr.aria-label]="'Editar animal ' + (animal.name || animal.siniiga)"
+                          class="inline-flex items-center gap-1.5 text-xs text-green-800 hover:underline dark:text-green-200">
+                          <lucide-icon [img]="editIcon" [size]="15" aria-hidden="true" />
+                          Editar
+                        </button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="4" class="py-14 text-center text-sm text-stone-500">
+                    {{
+                      search.controls.q.value || search.controls.sex.value
+                        ? 'No hay
+            animales con esa búsqueda.'
+                        : 'Tu hato está vacío. Registra el
+            primer animal para comenzar.'
+                    }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-5 flex flex-wrap items-center justify-between gap-4 text-xs text-stone-500">
+          <p>{{ total() }} animales · Página {{ page() + 1 }}</p>
+          <div class="flex gap-3">
+            <button
+              type="button"
+              (click)="changePage(-1)"
+              [disabled]="page() === 0"
+              class="rounded-lg border border-stone-200 px-3 py-2 disabled:opacity-40 dark:border-white/15">
+              Anterior</button
+            ><button
+              type="button"
+              (click)="changePage(1)"
+              [disabled]="(page() + 1) * pageSize >= total()"
+              class="rounded-lg border border-stone-200 px-3 py-2 disabled:opacity-40 dark:border-white/15">
+              Siguiente
+            </button>
+          </div>
+        </div>
+      }
+    }
+  </div>
+}
+@if (formOpen()) {
+  <app-modal
+    [title]="editing() ? 'Editar animal' : 'Registrar animal'"
+    [busy]="busy() || breedBusy()"
+    (dismiss)="closeForm()">
+    <form [formGroup]="form" (ngSubmit)="save()" novalidate data-testid="animal-form">
+      <fieldset [disabled]="busy() || breedBusy()" class="min-w-0 space-y-6">
+        <div>
+          <h3 class="mb-4 text-sm font-medium">Identificación</h3>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label for="animal-name" class="mb-2 block text-xs font-medium">Nombre</label
+              ><input
+                id="animal-name"
+                formControlName="name"
+                maxlength="100"
+                autofocus
+                class="w-full rounded-lg border border-stone-300 bg-white px-3 py-3 text-sm outline-none focus:border-green-700 dark:border-white/15 dark:bg-[#202020]" />
+            </div>
+            <div>
+              <label for="animal-siniiga" class="mb-2 block text-xs font-medium">SINIIGA</label
+              ><input
+                id="animal-siniiga"
+                formControlName="siniiga"
+                maxlength="30"
+                class="w-full rounded-lg border border-stone-300 bg-white px-3 py-3 text-sm outline-none focus:border-green-700 dark:border-white/15 dark:bg-[#202020]" />
+            </div>
+            <div>
+              <label for="animal-sex" class="mb-2 block text-xs font-medium">Sexo *</label
+              ><select
+                id="animal-sex"
+                formControlName="sex"
+                class="w-full rounded-lg border border-stone-300 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#202020]">
+                <option value="female">Hembra</option>
+                <option value="male">Macho</option>
+              </select>
+            </div>
+            <div>
+              <label for="animal-birth" class="mb-2 block text-xs font-medium"
+                >Fecha de nacimiento</label
+              ><input
+                id="animal-birth"
+                type="date"
+                formControlName="birth_date"
+                [max]="today"
+                class="w-full min-w-0 rounded-lg border border-stone-300 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#202020]" />
+            </div>
+            <div class="sm:col-span-2">
+              <label for="animal-origin" class="mb-2 block text-xs font-medium">Origen *</label
+              ><select
+                id="animal-origin"
+                formControlName="origin"
+                class="w-full rounded-lg border border-stone-300 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#202020]">
+                <option value="born_in_herd">Nacido en el hato</option>
+                <option value="purchased">Comprado</option>
+                <option value="donated">Donado</option>
+                <option value="other">Otro</option>
+              </select>
+            </div>
+          </div>
+          <p class="mt-3 text-xs leading-5 text-stone-500">
+            Ingresa al menos el nombre o el SINIIGA. Puedes completar la identificación después.
+          </p>
+          <label class="mt-4 inline-flex items-center gap-3 text-sm"
+            ><input type="checkbox" formControlName="is_breeder" class="size-4 accent-green-800" />
+            Es reproductor</label
+          >
+        </div>
+        <div class="border-t border-stone-200 pt-5 dark:border-white/10">
+          <div class="mb-4 flex items-center justify-between gap-3">
+            <h3 class="text-sm font-medium">Composición racial</h3>
+            <button
+              type="button"
+              (click)="addShare()"
+              [disabled]="catalogLoading() || !breeds().length"
+              class="text-xs text-green-800 disabled:opacity-40 dark:text-green-200">
+              Añadir otra raza
+            </button>
+          </div>
+          @if (catalogLoading()) {
+            <p role="status" class="text-xs text-stone-500">Cargando razas…</p>
+          }
+          <div formArrayName="breeds" class="space-y-3">
+            @for (share of form.controls.breeds.controls; track share; let index = $index) {
+              <div [formGroupName]="index" class="flex items-start gap-2">
+                <div class="min-w-0 flex-1">
+                  <label [for]="'animal-breed-' + index" class="mb-2 block text-xs">Raza</label
+                  ><select
+                    [id]="'animal-breed-' + index"
+                    formControlName="breed_id"
+                    class="w-full rounded-lg border border-stone-300 bg-white px-2 py-3 text-sm dark:border-white/15 dark:bg-[#202020]">
+                    <option [ngValue]="0">Selecciona</option>
+                    @for (breed of breeds(); track breed.id) {
+                      <option [ngValue]="breed.id">{{ breed.name }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="w-24 shrink-0">
+                  <label [for]="'animal-percentage-' + index" class="mb-2 block text-xs"
+                    >Porcentaje</label
+                  ><input
+                    [id]="'animal-percentage-' + index"
+                    formControlName="percentage"
+                    type="number"
+                    min="0.01"
+                    max="100"
+                    step="0.01"
+                    class="w-full rounded-lg border border-stone-300 bg-white px-2 py-3 text-sm dark:border-white/15 dark:bg-[#202020]" />
+                </div>
+                <button
+                  type="button"
+                  (click)="removeShare(index)"
+                  [attr.aria-label]="'Quitar raza ' + (index + 1)"
+                  class="mt-7 px-1 py-2 text-lg text-stone-400">
+                  ×
+                </button>
+              </div>
+              @if (share.touched && share.invalid) {
+                <p class="text-xs text-red-700 dark:text-red-300">
+                  Selecciona una raza y un porcentaje mayor que 0, con hasta dos decimales.
+                </p>
+              }
+            }
+          </div>
+          <p class="mt-3 text-xs leading-5 text-stone-500">
+            {{
+              form.controls.breeds.length
+                ? 'Total: ' +
+                  percentageTotal() +
+                  ' %.
+          Debe sumar 100 %. Si desconoces la raza, quita la fila con ×.'
+                : 'Puedes dejar las razas pendientes si aún no las
+          conoces.'
+            }}
+          </p>
+          <div class="mt-5">
+            <label for="new-breed" class="mb-2 block text-xs"
+              >¿Falta una raza en el catálogo?</label
+            >
+            <div class="flex gap-2">
+              <input
+                id="new-breed"
+                [formControl]="breedName"
+                maxlength="80"
+                placeholder="Nombre de la raza"
+                class="min-w-0 flex-1 rounded-lg border border-stone-300 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#202020]" /><button
+                type="button"
+                (click)="createBreed()"
+                [disabled]="breedBusy() || catalogLoading()"
+                class="rounded-lg border border-stone-200 px-3 text-xs dark:border-white/15">
+                {{ breedBusy() ? 'Guardando…' : 'Registrar raza' }}
+              </button>
+            </div>
+            <p class="mt-2 text-xs leading-5 text-stone-500">
+              La raza se guarda en el catálogo y se añade a este animal.
+            </p>
+            @if (breedName.touched && breedName.invalid) {
+              <p class="mt-2 text-xs text-red-700 dark:text-red-300">
+                Ingresa un nombre de raza de 1 a 80 caracteres.
+              </p>
+            }
+            @if (breedError()) {
+              <p role="alert" class="mt-2 text-xs text-red-700 dark:text-red-300">
+                {{ breedError() }}
+              </p>
+            }
+          </div>
+        </div>
+        <div class="border-t border-stone-200 pt-5 dark:border-white/10">
+          <h3 class="mb-4 text-sm font-medium">Parentesco</h3>
+          <p class="mb-4 text-xs leading-5 text-stone-500">
+            Selecciona a los padres biológicos ya registrados. Si no los conoces, deja los campos
+            vacíos. Las opciones excluyen descendientes y parejas reproductivas para asignar padres
+            nuevos. Busca por nombre o SINIIGA para localizar otros animales.
+          </p>
+          <div [formGroup]="parentSearch" class="mb-4 grid gap-3 sm:grid-cols-2">
+            <div>
+              <label for="mother-search" class="mb-2 block text-xs">Buscar madre</label
+              ><input
+                id="mother-search"
+                formControlName="mother"
+                maxlength="100"
+                class="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm dark:border-white/15 dark:bg-[#202020]" />
+            </div>
+            <div>
+              <label for="father-search" class="mb-2 block text-xs">Buscar padre</label
+              ><input
+                id="father-search"
+                formControlName="father"
+                maxlength="100"
+                class="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm dark:border-white/15 dark:bg-[#202020]" />
+            </div>
+          </div>
+          <button
+            type="button"
+            (click)="loadParents()"
+            [disabled]="parentLoading()"
+            class="mb-4 text-xs text-green-800 disabled:opacity-40 dark:text-green-200">
+            {{ parentLoading() ? 'Buscando padres…' : 'Buscar padres' }}
+          </button>
+          @if (parentError()) {
+            <p role="alert" class="mb-3 text-xs text-red-700 dark:text-red-300">
+              {{ parentError() }}
+            </p>
+          }
+          <div class="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label for="animal-mother" class="mb-2 block text-xs font-medium"
+                >Madre biológica</label
+              ><select
+                id="animal-mother"
+                formControlName="mother_id"
+                class="w-full rounded-lg border border-stone-300 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#202020]">
+                <option value="">Desconocida</option>
+                @for (mother of mothers(); track mother.id) {
+                  <option [value]="mother.id">{{ animalLabel(mother) }}</option>
+                }
+              </select>
+            </div>
+            <div>
+              <label for="animal-father" class="mb-2 block text-xs font-medium"
+                >Padre biológico</label
+              ><select
+                id="animal-father"
+                formControlName="father_id"
+                class="w-full rounded-lg border border-stone-300 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#202020]">
+                <option value="">Desconocido</option>
+                @for (father of fathers(); track father.id) {
+                  <option [value]="father.id">{{ animalLabel(father) }}</option>
+                }
+              </select>
+            </div>
+          </div>
+        </div>
+      </fieldset>
+      @if (formError()) {
+        <p
+          role="alert"
+          class="mt-5 rounded-lg bg-red-50 p-3 text-xs leading-6 text-red-700 dark:bg-red-950/30 dark:text-red-200">
+          {{ formError() }}
+        </p>
+      }
+      <div class="mt-7 flex justify-end gap-3 border-t border-stone-200 pt-5 dark:border-white/10">
+        <button
+          type="button"
+          (click)="closeForm()"
+          [disabled]="busy() || breedBusy()"
+          class="rounded-lg border border-stone-200 px-4 py-3 text-xs dark:border-white/15">
+          Cancelar</button
+        ><button
+          type="submit"
+          [disabled]="
+            busy() || breedBusy() || !catalogReady() || parentLoading() || !!parentError()
+          "
+          class="rounded-lg bg-green-900 px-5 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+          {{
+            busy()
+              ? 'Guardando…'
+              : editing()
+                ? 'Guardar cambios'
+                : 'Registrar
+        animal'
+          }}
+        </button>
+      </div>
+    </form>
+  </app-modal>
+}
+@if (detail(); as animal) {
+  <app-detail-page title="Ficha del animal" [busy]="decisionBusy()" (dismiss)="closeAnimalDetail()">
+    <h3 class="text-xl font-medium">{{ animal.name || 'Sin nombre' }}</h3>
+    <p class="mt-2 text-sm text-stone-500">
+      {{ animal.siniiga || 'SINIIGA pendiente' }}
+    </p>
+    <dl class="mt-6 grid grid-cols-2 gap-x-5 gap-y-6 text-sm">
+      <div>
+        <dt class="mb-1 text-xs text-stone-500">Sexo</dt>
+        <dd>{{ sexLabel(animal.sex) }}</dd>
+      </div>
+      <div>
+        <dt class="mb-1 text-xs text-stone-500">Nacimiento</dt>
+        <dd>
+          {{ animal.birth_date ? (animal.birth_date | date: 'dd/MM/yyyy' : 'UTC') : 'Desconocido' }}
+        </dd>
+      </div>
+      <div>
+        <dt class="mb-1 text-xs text-stone-500">Estado</dt>
+        <dd>
+          {{ statusLabel(animal.status || 'active') }}
+          @if (animal.exit_date) {
+            · {{ animal.exit_date | date: 'dd/MM/yyyy' : 'UTC' }}
+          }
+        </dd>
+      </div>
+      <div>
+        <dt class="mb-1 text-xs text-stone-500">Origen</dt>
+        <dd>{{ originLabel(animal.origin) }}</dd>
+      </div>
+      <div>
+        <dt class="mb-1 text-xs text-stone-500">Reproductor</dt>
+        <dd>{{ animal.is_breeder ? 'Sí' : 'No' }}</dd>
+      </div>
+      <div>
+        <dt class="mb-1 text-xs text-stone-500">Madre</dt>
+        <dd>{{ animal.mother ? animalLabel(animal.mother) : 'Desconocida' }}</dd>
+      </div>
+      <div>
+        <dt class="mb-1 text-xs text-stone-500">Padre</dt>
+        <dd>{{ animal.father ? animalLabel(animal.father) : 'Desconocido' }}</dd>
+      </div>
+      <div class="col-span-2">
+        <dt class="mb-1 text-xs text-stone-500">Ubicación actual</dt>
+        <dd>
+          {{
+            animal.current_location?.name ||
+              (animal.status && animal.status !== 'active'
+                ? 'Fuera del hato'
+                : 'Sin ubicación registrada')
+          }}
+          @if (animal.current_location) {
+            · Desde {{ animal.current_location.since | date: 'dd/MM/yyyy' }}
+          }
+        </dd>
+      </div>
+      <div class="col-span-2 border-t border-stone-200 pt-5 dark:border-white/10">
+        <dt class="mb-2 text-xs text-stone-500">
+          Razas ·
+          {{
+            animal.purity === 'pure'
+              ? 'Puro'
+              : animal.purity === 'crossbred'
+                ? 'Cruza'
+                : 'Pendientes'
+          }}
+        </dt>
+        <dd class="leading-7">
+          @for (share of animal.breeds; track share.breed_id) {
+            <span class="block">{{ share.name }} · {{ share.percentage }} %</span>
+          } @empty {
+            Sin composición racial registrada.
+          }
+        </dd>
+      </div>
+    </dl>
+    <app-animal-weight-chart [animalId]="animal.id" />
+    <app-reaction-summary [animalId]="animal.id" />
+    <app-incident-summary [animalId]="animal.id" />
+    <app-physical-summary [animalId]="animal.id" />
+    <app-assessment-summary [animalId]="animal.id" />
+    <app-animal-timeline [animalId]="animal.id" />
+    <app-animal-weaning [animalId]="animal.id" />
+    <app-animal-decisions
+      [animal]="animal"
+      [canWrite]="canWrite()"
+      (busyChange)="decisionBusy.set($event)" />
+    <div class="mt-7 flex justify-end gap-3">
+      <a
+        [routerLink]="['/dashboard/genealogy', animal.id]"
+        class="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-4 py-3 text-xs dark:border-white/15"
+        ><lucide-icon [img]="familyIcon" [size]="15" />Genealogía</a
+      >
+      <button
+        type="button"
+        (click)="closeAnimalDetail()"
+        [disabled]="decisionBusy()"
+        class="rounded-lg border border-stone-200 px-4 py-3 text-xs dark:border-white/15">
+        Volver al listado
+      </button>
+      @if (canWrite()) {
+        <button
+          type="button"
+          (click)="openForm(animal)"
+          class="rounded-lg bg-green-900 px-4 py-3 text-xs text-white dark:bg-stone-100 dark:text-stone-950">
+          Editar animal
+        </button>
+      }
+    </div>
+  </app-detail-page>
+}

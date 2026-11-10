@@ -1,0 +1,181 @@
+<div class="mx-auto max-w-6xl">
+  <header class="mb-7 flex flex-wrap items-end justify-between gap-5">
+    <div>
+      <p class="mb-3 text-xs text-stone-500">Mi rancho / Sanidad</p>
+      <h1 class="text-2xl font-medium tracking-tight sm:text-3xl">Principios activos</h1>
+      <p class="mt-3 max-w-2xl text-sm leading-6 text-stone-500">
+        Sustancias que puedes asignar a la composición de tus productos. Consulta y administra el
+        catálogo por nombre.
+      </p>
+    </div>
+    @if (canWrite()) {
+      <button
+        type="button"
+        (click)="open()"
+        data-new-ingredient
+        class="inline-flex items-center gap-2 rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white dark:bg-stone-100 dark:text-stone-950">
+        <lucide-icon [img]="plus" [size]="16" />Nuevo principio activo
+      </button>
+    }
+  </header>
+  <app-health-nav />
+  @if (!canRead()) {
+    <p class="py-8 text-sm text-stone-500">No tienes permiso para consultar principios activos.</p>
+  } @else {
+    @if (success()) {
+      <p role="status" class="mb-5 text-sm">{{ success() }}</p>
+    }
+    <form (submit)="$event.preventDefault(); load()" class="mb-6 flex max-w-xl items-end gap-3">
+      <label class="min-w-0 flex-1 text-xs"
+        >Buscar por nombre<input
+          aria-label="Buscar por nombre"
+          [value]="query()"
+          (input)="query.set($any($event.target).value)"
+          maxlength="120"
+          class="mt-2 w-full rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" /></label
+      ><button
+        class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white dark:bg-stone-100 dark:text-stone-950">
+        Buscar
+      </button>
+    </form>
+    @if (error()) {
+      <p role="alert" class="mb-5 text-sm text-red-600">
+        {{ error() }} <button (click)="load(page().offset)" class="underline">Reintentar</button>
+      </p>
+    }
+    @if (loading()) {
+      <p class="py-8 text-sm text-stone-500">Cargando principios activos…</p>
+    } @else if (!error()) {
+      <div class="relative overflow-x-auto">
+        <table class="w-full min-w-[480px] text-left text-sm">
+          <thead class="border-b border-stone-200 text-xs text-stone-500 dark:border-white/10">
+            <tr>
+              <th class="px-3 py-4 font-medium">Principio activo</th>
+              <th class="px-3 py-4 font-medium">Productos vinculados</th>
+              @if (canWrite()) {
+                <th class="px-3 py-4 font-medium">Acciones</th>
+              }
+            </tr>
+          </thead>
+          <tbody>
+            @for (i of page().items; track i.id) {
+              <tr
+                [attr.data-ingredient]="i.id"
+                class="border-b border-stone-200 dark:border-white/10">
+                <td class="max-w-xs break-words px-3 py-5 font-medium">{{ i.name }}</td>
+                <td class="px-3 py-5 text-stone-500">{{ i.product_count }}</td>
+                @if (canWrite()) {
+                  <td class="px-3 py-5">
+                    <div class="flex gap-2">
+                      <button
+                        (click)="open(i)"
+                        [attr.aria-label]="'Editar ' + i.name"
+                        title="Editar principio activo"
+                        class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-stone-200 hover:bg-stone-100 dark:border-white/15 dark:hover:bg-white/5">
+                        <lucide-icon [img]="pencil" [size]="16" /></button
+                      ><button
+                        (click)="confirmDelete(i)"
+                        [disabled]="i.product_count > 0"
+                        [attr.aria-label]="'Eliminar ' + i.name"
+                        [title]="
+                          i.product_count
+                            ? 'Está asignado a productos'
+                            : 'Eliminar principio activo'
+                        "
+                        class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-stone-200 hover:bg-stone-100 disabled:opacity-30 dark:border-white/15 dark:hover:bg-white/5">
+                        <lucide-icon [img]="trash" [size]="16" />
+                      </button>
+                    </div>
+                  </td>
+                }
+              </tr>
+            } @empty {
+              <tr>
+                <td [attr.colspan]="canWrite() ? 3 : 2" class="py-10 text-center text-stone-500">
+                  Sin principios activos con estos filtros.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <p class="mt-4 text-xs leading-5 text-stone-500">
+        Para eliminar un principio activo, primero debe estar sin asignar a productos. El conteo
+        incluye productos inactivos.
+      </p>
+      <div class="mt-5 flex justify-between gap-4 text-xs">
+        <span>{{ page().total }} principios activos</span>
+        <div class="flex gap-4">
+          <button
+            [disabled]="page().offset === 0"
+            (click)="load(page().offset - 25)"
+            class="disabled:opacity-40">
+            Anterior</button
+          ><button
+            [disabled]="page().offset + 25 >= page().total"
+            (click)="load(page().offset + 25)"
+            class="disabled:opacity-40">
+            Siguiente
+          </button>
+        </div>
+      </div>
+    }
+  }
+</div>
+@if (formOpen()) {
+  <app-modal
+    [title]="editing() ? 'Editar principio activo' : 'Nuevo principio activo'"
+    [busy]="busy()"
+    (dismiss)="close()"
+    ><form [formGroup]="form" (ngSubmit)="save()">
+      <fieldset [disabled]="busy()" class="min-w-0 space-y-5">
+        <div>
+          <label for="ingredient-name" class="mb-2 block text-xs">Nombre *</label
+          ><input
+            id="ingredient-name"
+            formControlName="name"
+            maxlength="120"
+            class="w-full rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+        </div>
+        @if (editing()?.product_count) {
+          <p class="text-xs leading-5 text-stone-500">
+            La corrección del nombre aparecerá en todos los productos que tengan este principio
+            activo asignado.
+          </p>
+        }
+        @if (form.invalid && form.touched) {
+          <p role="alert" class="text-sm text-red-600">
+            Escribe un nombre de hasta 120 caracteres.
+          </p>
+        }
+        @if (formError()) {
+          <p role="alert" class="text-sm text-red-600">{{ formError() }}</p>
+        }
+        <div class="flex justify-end gap-3 border-t border-stone-200 pt-5 dark:border-white/10">
+          <button type="button" (click)="close()" class="px-3 py-3 text-xs">Cancelar</button
+          ><button
+            class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white dark:bg-stone-100 dark:text-stone-950">
+            {{ busy() ? 'Guardando…' : 'Guardar principio activo' }}
+          </button>
+        </div>
+      </fieldset>
+    </form></app-modal
+  >
+}
+@if (removing(); as i) {
+  <app-modal title="Eliminar principio activo" [busy]="busy()" (dismiss)="close()"
+    ><p class="break-words text-sm leading-6">Se eliminará {{ i.name }} del catálogo.</p>
+    @if (formError()) {
+      <p role="alert" class="mt-4 text-sm text-red-600">{{ formError() }}</p>
+    }
+    <div class="mt-6 flex justify-end gap-3">
+      <button [disabled]="busy()" (click)="close()" class="px-3 py-3 text-xs">Cancelar</button
+      ><button
+        [disabled]="busy()"
+        (click)="remove()"
+        class="inline-flex items-center gap-2 rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white dark:bg-stone-100 dark:text-stone-950">
+        <lucide-icon [img]="trash" [size]="15" />{{ busy() ? 'Eliminando…' : 'Eliminar' }}
+      </button>
+    </div></app-modal
+  >
+}

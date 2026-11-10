@@ -1,0 +1,109 @@
+<header
+  class="relative z-30 border-b border-stone-200/80 bg-white dark:border-white/10 dark:bg-[#171717]">
+  <div class="flex h-20 items-center justify-between gap-3 px-4 sm:px-8">
+    <a
+      class="flex shrink-0 items-center gap-2 rounded-xl focus-visible:outline-2 focus-visible:outline-amber-600 sm:gap-3"
+      routerLink="/dashboard/overview"
+      aria-label="Pelifolk, inicio">
+      <img
+        class="size-10 object-contain sm:size-12"
+        src="assets/logo.png"
+        alt=""
+        width="48"
+        height="48" />
+      <span
+        class="inline-flex items-baseline text-xl font-semibold tracking-tight text-green-950 dark:text-stone-100 sm:text-2xl"
+        aria-hidden="true"
+        >Pelif<img
+          class="mx-0.5 size-[0.65em] object-contain"
+          src="assets/o_logo.png"
+          alt=""
+          width="20"
+          height="19" />lk</span
+      >
+    </a>
+    <div class="flex items-center gap-2 sm:gap-5">
+      <button
+        type="button"
+        class="flex size-10 cursor-pointer items-center justify-center rounded-full text-stone-500 transition hover:bg-stone-100 focus-visible:outline-2 focus-visible:outline-amber-600 dark:text-stone-300 dark:hover:bg-white/10"
+        [attr.aria-label]="theme.dark() ? 'Activar modo claro' : 'Activar modo oscuro'"
+        [title]="theme.dark() ? 'Modo claro' : 'Modo oscuro'"
+        (click)="theme.toggle()">
+        <lucide-icon [img]="theme.dark() ? sunIcon : moonIcon" [size]="20" aria-hidden="true" />
+      </button>
+      <div
+        class="relative border-l border-stone-200 pl-2 dark:border-white/10 sm:pl-5"
+        (focusout)="
+          !$any($event.currentTarget).contains($event.relatedTarget) && menuOpen.set(false)
+        ">
+        <button
+          #profileButton
+          type="button"
+          class="flex cursor-pointer items-center gap-3 rounded-xl p-1.5 text-left transition hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-amber-600 dark:hover:bg-white/5"
+          aria-label="Opciones de usuario"
+          aria-controls="profile-options"
+          [attr.aria-expanded]="menuOpen()"
+          (click)="menuOpen.set(!menuOpen())">
+          <span
+            class="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-green-100 text-green-800 ring-2 ring-white dark:bg-white/10 dark:text-green-200 dark:ring-white/10">
+            @if (photoUrl() && photoUrl() !== failedPhotoUrl()) {
+              <img
+                class="size-full object-cover"
+                [src]="photoUrl()"
+                alt=""
+                width="40"
+                height="40"
+                referrerpolicy="no-referrer"
+                (error)="failedPhotoUrl.set(photoUrl())" />
+            } @else {
+              <lucide-icon [img]="userIcon" [size]="20" aria-hidden="true" />
+            }
+          </span>
+          <span class="hidden min-w-0 sm:block">
+            <span
+              class="block max-w-40 truncate text-xs font-semibold"
+              [title]="userName() || 'Usuario'"
+              >{{ userName() || 'Usuario' }}</span
+            >
+            <span class="mt-1 block text-[10px] text-stone-500 dark:text-stone-400">{{
+              signedIn() ? 'Mi cuenta' : 'Sin sesión iniciada'
+            }}</span>
+          </span>
+          <lucide-icon
+            class="text-stone-400 transition-transform"
+            [class.rotate-180]="menuOpen()"
+            [img]="chevronIcon"
+            [size]="15"
+            aria-hidden="true" />
+        </button>
+        @if (menuOpen()) {
+          <div
+            id="profile-options"
+            class="absolute right-0 top-full mt-3 w-64 overflow-hidden rounded-2xl border border-stone-200 bg-white p-2 shadow-xl shadow-green-950/10 dark:border-white/10 dark:bg-[#202020] dark:shadow-black/30">
+            <div class="border-b border-stone-100 px-3 py-3 dark:border-white/10">
+              <p class="truncate text-sm font-semibold">{{ userName() || 'Usuario' }}</p>
+              <p class="mt-1 text-xs text-stone-500 dark:text-stone-400">
+                {{ signedIn() ? 'Sesión activa' : 'Sin sesión iniciada' }}
+              </p>
+            </div>
+            @if (signedIn()) {
+              <a
+                routerLink="/dashboard/profile"
+                (click)="closeMenu()"
+                class="mt-1 flex items-center gap-3 rounded-xl px-3 py-3 text-xs font-medium text-stone-700 hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-amber-600 dark:text-stone-200 dark:hover:bg-white/5">
+                <lucide-icon [img]="userIcon" [size]="18" aria-hidden="true" /> Mi perfil
+              </a>
+            }
+            <button
+              class="mt-1 flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-3 text-left text-xs font-medium text-red-600 transition hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-500 disabled:cursor-default disabled:opacity-40 dark:text-red-300 dark:hover:bg-red-500/10"
+              type="button"
+              [disabled]="!signedIn()"
+              (click)="signOut()">
+              <lucide-icon [img]="logoutIcon" [size]="18" aria-hidden="true" /> Cerrar sesión
+            </button>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+</header>

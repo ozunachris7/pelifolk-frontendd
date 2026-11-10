@@ -1,0 +1,308 @@
+@if (allowed()) {
+  <section class="my-7 min-w-0 border-y border-stone-200 py-6 dark:border-white/10">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h3 class="text-base font-medium">Reparto calculado de lotes</h3>
+        <p class="mt-2 text-xs text-stone-500">
+          {{
+            kind() === 'animal'
+              ? 'Importes del lote atribuidos a este animal por sus fechas de pertenencia.'
+              : 'Distribución de los importes del lote entre sus miembros históricos.'
+          }}
+        </p>
+      </div>
+      <button
+        type="button"
+        (click)="toggle()"
+        [attr.aria-expanded]="open()"
+        data-group-distribution
+        class="rounded-lg border border-stone-200 px-3 py-2 text-xs dark:border-white/15">
+        {{ open() ? 'Ocultar reparto' : 'Consultar reparto' }}
+      </button>
+    </div>
+    @if (open()) {
+      <p class="mt-5 text-xs leading-6 text-stone-500">
+        Cada gasto asignado al lote y cada consumo del lote se reparte por igual entre sus miembros
+        en la fecha del registro. Se incluyen los días de entrada y salida; se excluyen fechas
+        anteriores al nacimiento o posteriores a una baja. Los centavos sobrantes se asignan por ID
+        de animal en orden estable. Esto atribuye costos, no cantidades de alimento consumidas por
+        cada animal.
+      </p>
+      <p class="mt-2 text-xs leading-6 text-stone-500">
+        El cálculo usa el historial disponible al consultar. Cambios en pertenencias, asignaciones o
+        precios pueden cambiar el resultado. No guarda gastos nuevos ni modifica las asignaciones
+        originales. Gastos y alimentación permanecen separados porque pueden corresponder a la misma
+        compra.
+      </p>
+      <div class="my-5 flex flex-wrap gap-5 border-b border-stone-200 text-xs dark:border-white/10">
+        <button
+          type="button"
+          (click)="view.set('animals')"
+          [attr.aria-pressed]="view() === 'animals'"
+          class="pb-3"
+          [class.font-semibold]="view() === 'animals'">
+          Por animal</button
+        ><button
+          type="button"
+          (click)="view.set('sources')"
+          [attr.aria-pressed]="view() === 'sources'"
+          class="pb-3"
+          [class.font-semibold]="view() === 'sources'">
+          Origen del reparto
+        </button>
+      </div>
+      @if (loading()) {
+        <p class="py-6 text-sm text-stone-500">Calculando reparto…</p>
+      } @else if (error()) {
+        <p role="alert" class="py-4 text-sm text-red-600">
+          {{ error() }}
+          <button (click)="load(page()?.offset || 0)" class="underline">Reintentar</button>
+        </p>
+      } @else if (page(); as p) {
+        <div class="mb-5 flex flex-wrap gap-x-10 gap-y-5">
+          <div>
+            <h4 class="text-xs text-stone-500">
+              Gastos atribuidos {{ kind() === 'animal' ? 'a este animal' : 'entre miembros' }}
+            </h4>
+            <p class="mt-2 text-xl font-medium" data-attributed-expenses>
+              {{ p.summary.attributed_expenses | currency: 'MXN' : 'symbol' : '1.2-2' }}
+            </p>
+          </div>
+          @if (p.feeding_included) {
+            <div>
+              <h4 class="text-xs text-stone-500">Alimentación atribuida · subtotal conocido</h4>
+              <p class="mt-2 text-xl font-medium" data-attributed-feeding>
+                {{ p.summary.attributed_feeding | currency: 'MXN' : 'symbol' : '1.2-2' }}
+              </p>
+              <p class="mt-1 text-xs text-stone-500">
+                {{ p.summary.unpriced_feeding || 0 }} consumos del lote sin precio
+              </p>
+            </div>
+          }
+        </div>
+        @if (p.kind === 'group' && p.summary.records_without_members) {
+          <p class="mb-5 text-xs leading-6 text-amber-700 dark:text-amber-400">
+            {{ p.summary.records_without_members }} registros sin miembros elegibles. Gastos sin
+            repartir: {{ p.summary.unallocated_expenses | currency: 'MXN' : 'symbol' : '1.2-2' }}.
+            @if (p.feeding_included) {
+              Alimentación conocida sin repartir:
+              {{ p.summary.unallocated_feeding | currency: 'MXN' : 'symbol' : '1.2-2' }}.
+            }
+            Consulta su origen.
+          </p>
+        }
+        @if (!p.feeding_included) {
+          <p class="mb-5 text-xs text-stone-500">
+            La alimentación requiere permiso de consulta de Alimentación.
+          </p>
+        }
+        @if (view() === 'animals') {
+          <div class="relative overflow-x-auto">
+            <table class="w-full min-w-[500px] text-left text-sm">
+              <thead class="border-b border-stone-200 text-xs text-stone-500 dark:border-white/10">
+                <tr>
+                  <th class="px-3 py-4 font-medium">Animal</th>
+                  <th class="px-3 py-4 text-right font-medium">Gastos del lote atribuidos</th>
+                  @if (p.feeding_included) {
+                    <th class="px-3 py-4 text-right font-medium">Alimentación atribuida</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (r of animalRows(); track r.animal.id) {
+                  <tr class="border-b border-stone-200 dark:border-white/10">
+                    <td class="max-w-xs px-3 py-4">
+                      <p class="break-words font-medium">{{ label(r.animal) }}</p>
+                      <p class="mt-1 text-xs text-stone-500">
+                        {{ r.expense_records }}
+                        {{
+                          r.expense_records === 1 ? 'asignación de gasto' : 'asignaciones de gasto'
+                        }}
+                      </p>
+                    </td>
+                    <td class="px-3 py-4 text-right">
+                      {{ r.expenses | currency: 'MXN' : 'symbol' : '1.2-2' }}
+                    </td>
+                    @if (p.feeding_included) {
+                      <td class="px-3 py-4 text-right">
+                        <p>{{ r.feeding | currency: 'MXN' : 'symbol' : '1.2-2' }}</p>
+                        <p class="mt-1 text-xs text-stone-500">
+                          {{ r.feeding_records }}
+                          {{ r.feeding_records === 1 ? 'consumo' : 'consumos' }} ·
+                          {{ r.unpriced_feeding }} sin precio
+                        </p>
+                      </td>
+                    }
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td
+                      [attr.colspan]="p.feeding_included ? 3 : 2"
+                      class="py-8 text-center text-stone-500">
+                      Sin importes de lotes atribuibles con estas fechas.
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <div class="relative overflow-x-auto">
+            <table class="w-full min-w-[760px] text-left text-sm">
+              <thead class="border-b border-stone-200 text-xs text-stone-500 dark:border-white/10">
+                <tr>
+                  <th class="px-3 py-4 font-medium">Fecha / origen</th>
+                  <th class="px-3 py-4 font-medium">Lote</th>
+                  <th class="px-3 py-4 text-right font-medium">Importe del lote</th>
+                  <th class="px-3 py-4 text-right font-medium">Miembros</th>
+                  @if (kind() === 'animal') {
+                    <th class="px-3 py-4 text-right font-medium">Parte del animal</th>
+                  }
+                  <th class="px-3 py-4 font-medium">Detalle</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (r of sourceRows(); track r.kind + '-' + r.id) {
+                  <tr class="border-b border-stone-200 align-top dark:border-white/10">
+                    <td class="max-w-xs px-3 py-4">
+                      <p class="text-xs text-stone-500">
+                        {{ r.date | date: 'dd/MM/yyyy' : 'UTC' }} ·
+                        {{ r.kind === 'expense' ? 'Gasto asignado' : 'Alimentación' }}
+                      </p>
+                      <p class="mt-2 line-clamp-2 break-words">{{ r.title }}</p>
+                    </td>
+                    <td class="px-3 py-4">{{ r.group_name }}</td>
+                    <td class="px-3 py-4 text-right">
+                      {{
+                        r.amount !== null
+                          ? (r.amount | currency: 'MXN' : 'symbol' : '1.2-2')
+                          : 'Sin precio'
+                      }}
+                      @if (!r.member_count) {
+                        <p class="mt-1 text-xs text-stone-500">Sin miembros</p>
+                      }
+                    </td>
+                    <td class="px-3 py-4 text-right">{{ r.member_count }}</td>
+                    @if (kind() === 'animal') {
+                      <td class="px-3 py-4 text-right">
+                        {{
+                          r.animal_amount !== null
+                            ? (r.animal_amount | currency: 'MXN' : 'symbol' : '1.2-2')
+                            : 'Sin determinar'
+                        }}
+                      </td>
+                    }
+                    <td class="px-3 py-4">
+                      <button
+                        (click)="inspect(r)"
+                        [attr.aria-label]="'Ver reparto de ' + r.title"
+                        title="Ver reparto por animal"
+                        class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-stone-200 hover:bg-stone-100 dark:border-white/15 dark:hover:bg-white/5">
+                        <lucide-icon [img]="eye" [size]="17" />
+                      </button>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td
+                      [attr.colspan]="kind() === 'animal' ? 6 : 5"
+                      class="py-8 text-center text-stone-500">
+                      Sin registros del lote en estas fechas.
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+        <div class="mt-5 flex flex-wrap justify-between gap-3 text-xs text-stone-500">
+          <span
+            >{{ p.total }} {{ view() === 'animals' ? 'animales' : 'registros' }} · Al
+            {{ p.as_of | date: 'dd/MM/yyyy' : 'UTC' }}</span
+          >
+          <div class="flex gap-4">
+            <button
+              [disabled]="p.offset === 0"
+              (click)="load(p.offset - 25)"
+              class="disabled:opacity-40">
+              Anterior</button
+            ><button
+              [disabled]="p.offset + 25 >= p.total"
+              (click)="load(p.offset + 25)"
+              class="disabled:opacity-40">
+              Siguiente</button
+            ><button (click)="load(p.offset)" class="underline">Actualizar</button>
+          </div>
+        </div>
+      }
+    }
+  </section>
+}
+@if (selected(); as source) {
+  <app-modal title="Origen y reparto del costo" (dismiss)="closeDetail()">
+    @if (detailLoading()) {
+      <p class="text-sm text-stone-500">Consultando origen…</p>
+    } @else if (detailError()) {
+      <p role="alert" class="text-sm text-red-600">
+        {{ detailError() }}
+        <button (click)="loadDetail(detail()?.offset || 0)" class="underline">Reintentar</button>
+      </p>
+    } @else if (detail(); as d) {
+      <h3 class="break-words text-lg font-medium">{{ d.source.title }}</h3>
+      <p class="mt-2 text-xs text-stone-500">
+        {{ d.source.group_name }} · {{ d.source.date | date: 'dd/MM/yyyy' : 'UTC' }}
+      </p>
+      <div class="my-5 space-y-2 border-y border-stone-200 py-4 text-sm dark:border-white/10">
+        @if (d.source.kind === 'expense') {
+          <p>
+            Gasto original: {{ d.source.original_amount | currency: 'MXN' : 'symbol' : '1.2-2' }}
+          </p>
+          <p>Asignado a este lote: {{ d.source.percentage }} %</p>
+        }
+        <p>
+          Importe del lote:
+          {{
+            d.source.amount !== null
+              ? (d.source.amount | currency: 'MXN' : 'symbol' : '1.2-2')
+              : 'Sin precio vigente'
+          }}
+        </p>
+        <p>Miembros en esa fecha: {{ d.source.member_count }}</p>
+      </div>
+      <p class="mb-5 text-xs leading-6 text-stone-500">
+        Reparto igual por miembro en la fecha del registro. Los centavos restantes se asignan por ID
+        en orden estable. Los importes de todas las páginas suman el importe conocido del lote
+        cuando existen miembros.
+      </p>
+      <ol class="divide-y divide-stone-200 dark:divide-white/10">
+        @for (r of d.items; track r.animal.id) {
+          <li class="flex justify-between gap-4 py-4 text-sm">
+            <span class="min-w-0 break-words">{{ label(r.animal) }}</span
+            ><span class="whitespace-nowrap font-medium">{{
+              r.amount !== null
+                ? (r.amount | currency: 'MXN' : 'symbol' : '1.2-2')
+                : 'Sin determinar'
+            }}</span>
+          </li>
+        } @empty {
+          <li class="py-4 text-xs text-stone-500">
+            Sin miembros elegibles. El importe queda sin repartir.
+          </li>
+        }
+      </ol>
+      <div class="mt-5 flex justify-end gap-4 text-xs">
+        <button
+          [disabled]="d.offset === 0"
+          (click)="loadDetail(d.offset - 25)"
+          class="disabled:opacity-40">
+          Anterior</button
+        ><button
+          [disabled]="d.offset + 25 >= d.total"
+          (click)="loadDetail(d.offset + 25)"
+          class="disabled:opacity-40">
+          Siguiente
+        </button>
+      </div>
+    }
+  </app-modal>
+}

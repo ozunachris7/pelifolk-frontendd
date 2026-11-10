@@ -1,0 +1,429 @@
+@if (!selected()) {
+  @if (!allowed) {
+    <p class="p-8 text-sm text-stone-500">No tienes permiso para consultar Reproducción.</p>
+  } @else {
+    <header class="mb-6">
+      <p class="text-xs uppercase tracking-widest text-stone-500">Mi rancho / Reproducción</p>
+      <h1 class="mt-2 text-2xl font-medium tracking-tight">Indicadores reproductivos</h1>
+      <p class="mt-3 max-w-3xl text-sm leading-6 text-stone-500">
+        Resultados registrados por hembra. Cada indicador muestra su base de cálculo y los datos que
+        quedan fuera.
+      </p>
+    </header>
+    <nav
+      aria-label="Reproducción"
+      class="mb-7 flex flex-wrap gap-5 border-b border-stone-200 text-sm dark:border-white/10">
+      <a routerLink="/dashboard/breeding" class="py-3 text-stone-500">Registros reproductivos</a
+      ><a routerLink="/dashboard/breeding/performance" class="py-3 text-stone-500">Desempeño</a
+      ><a routerLink="/dashboard/breeding/assessments" class="py-3 text-stone-500"
+        >Evaluaciones maternas y de crías</a
+      ><a
+        routerLink="/dashboard/breeding/indicators"
+        aria-current="page"
+        class="border-b-2 border-green-800 py-3 font-medium dark:border-green-200"
+        >Indicadores</a
+      >
+    </nav>
+    <form [formGroup]="form" (ngSubmit)="search()" class="mb-6 space-y-4">
+      <div class="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div>
+          <label for="indicator-q" class="mb-2 block text-xs">Hembra / SINIIGA</label
+          ><input
+            id="indicator-q"
+            formControlName="q"
+            maxlength="100"
+            class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+        </div>
+        <div>
+          <label for="indicator-from" class="mb-2 block text-xs">Desde (opcional)</label
+          ><input
+            id="indicator-from"
+            formControlName="date_from"
+            type="date"
+            [max]="today"
+            class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+        </div>
+        <div>
+          <label for="indicator-to" class="mb-2 block text-xs">Hasta (opcional)</label
+          ><input
+            id="indicator-to"
+            formControlName="date_to"
+            type="date"
+            [max]="today"
+            class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+        </div>
+        <div>
+          <label for="indicator-cutoff" class="mb-2 block text-xs">Fecha de corte *</label
+          ><input
+            id="indicator-cutoff"
+            formControlName="as_of"
+            type="date"
+            [max]="today"
+            class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+        </div>
+        <div>
+          <label for="indicator-age" class="mb-2 block text-xs">Edad de las crías (días) *</label
+          ><input
+            id="indicator-age"
+            formControlName="age_days"
+            type="number"
+            min="1"
+            max="730"
+            step="1"
+            class="w-full min-w-0 rounded-lg border border-stone-200 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-4">
+        <button
+          type="submit"
+          class="rounded-lg bg-green-900 px-4 py-3 text-sm font-medium text-white dark:bg-stone-100 dark:text-stone-950">
+          Calcular
+        </button>
+        @if (animalFilter()) {
+          <button type="button" (click)="clearAnimal()" class="text-xs underline">
+            Consultar todas las hembras
+          </button>
+        }
+        <p class="text-xs leading-5 text-stone-500">
+          Desde y Hasta seleccionan montas, partos y nacimientos; el seguimiento llega hasta la
+          fecha de corte.
+        </p>
+      </div>
+    </form>
+    @if (error()) {
+      <p role="alert" class="mb-4 text-sm text-red-700 dark:text-red-300">{{ error() }}</p>
+    }
+    @if (loading()) {
+      <p role="status" class="py-10 text-sm text-stone-500">Calculando indicadores…</p>
+    } @else if (page(); as p) {
+      <p class="mb-5 text-xs text-stone-500">
+        Periodo:
+        {{
+          p.date_from ? (p.date_from | date: 'dd/MM/yyyy' : 'UTC') : 'Desde el primer registro'
+        }}
+        — {{ p.date_to || p.as_of | date: 'dd/MM/yyyy' : 'UTC' }} · Corte:
+        {{ p.as_of | date: 'dd/MM/yyyy' : 'UTC' }} · Edad: {{ p.age_days }} días
+      </p>
+      <section
+        aria-label="Resumen de indicadores"
+        class="mb-7 grid grid-cols-1 gap-6 border-y border-stone-200 py-6 md:grid-cols-3 dark:border-white/10">
+        <div>
+          <h2 class="text-xs text-stone-500">Entre partos registrados</h2>
+          <p class="mt-3 text-2xl font-medium">
+            {{
+              p.summary.birth_intervals.average_days !== null
+                ? (p.summary.birth_intervals.average_days | number: '1.0-2')
+                : 'Sin base'
+            }}
+            @if (p.summary.birth_intervals.average_days !== null) {
+              <span class="ml-1 text-sm font-normal">días</span>
+            }
+          </p>
+          <p class="mt-2 text-xs text-stone-500">
+            {{ p.summary.birth_intervals.count }} intervalos · {{ p.summary.births }} partos en el
+            periodo
+          </p>
+        </div>
+        <div>
+          <h2 class="text-xs text-stone-500">Montas con diagnóstico gestante</h2>
+          <p class="mt-3 text-2xl font-medium">
+            {{
+              p.summary.pregnancy.percentage !== null
+                ? (p.summary.pregnancy.percentage | number: '1.0-2')
+                : 'Sin base'
+            }}
+            @if (p.summary.pregnancy.percentage !== null) {
+              <span class="ml-1 text-sm font-normal">%</span>
+            }
+          </p>
+          <p class="mt-2 text-xs">
+            {{ p.summary.pregnancy.pregnant }} / {{ p.summary.pregnancy.diagnosed }} con diagnóstico
+            concluyente
+          </p>
+          <p class="mt-2 text-xs text-stone-500">
+            {{ p.summary.pregnancy.no_diagnosis }} sin diagnóstico ·
+            {{ p.summary.pregnancy.uncertain }} dudosos
+          </p>
+        </div>
+        <div>
+          <h2 class="text-xs text-stone-500">Sin muerte registrada a {{ p.age_days }} días</h2>
+          <p class="mt-3 text-2xl font-medium">
+            {{
+              p.summary.followup.percentage !== null
+                ? (p.summary.followup.percentage | number: '1.0-2')
+                : 'Sin base'
+            }}
+            @if (p.summary.followup.percentage !== null) {
+              <span class="ml-1 text-sm font-normal">%</span>
+            }
+          </p>
+          <p class="mt-2 text-xs">
+            {{ p.summary.followup.without_recorded_death }} /
+            {{ p.summary.followup.observable }} crías con base para el cálculo
+          </p>
+          <p class="mt-2 text-xs text-stone-500">
+            {{ p.summary.followup.unobservable }} salidas tempranas ·
+            {{ p.summary.followup.too_young }} aún sin edad
+          </p>
+        </div>
+      </section>
+      <div class="relative overflow-x-auto rounded-xl border border-stone-200 dark:border-white/10">
+        <table class="w-full text-left text-sm">
+          <thead class="border-b border-stone-200 text-xs text-stone-500 dark:border-white/10">
+            <tr>
+              <th class="p-4">Hembra</th>
+              <th class="p-4">Entre partos</th>
+              <th class="p-4">Gestantes / concluyentes</th>
+              <th class="p-4">Sin muerte registrada a {{ p.age_days }} días</th>
+              <th class="p-4">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-stone-200 dark:divide-white/10">
+            @for (r of p.items; track r.animal.id) {
+              <tr data-indicator-row>
+                <td class="whitespace-nowrap p-4 font-medium">{{ label(r.animal) }}</td>
+                <td class="p-4">
+                  <p>
+                    {{
+                      r.birth_intervals.average_days !== null
+                        ? (r.birth_intervals.average_days | number: '1.0-2') + ' días'
+                        : 'Sin base'
+                    }}
+                  </p>
+                  <p class="mt-2 text-xs text-stone-500">
+                    {{ r.birth_intervals.count }} intervalos
+                  </p>
+                </td>
+                <td class="p-4">
+                  <p>
+                    {{ r.pregnancy.pregnant }} / {{ r.pregnancy.diagnosed }}
+                    @if (r.pregnancy.percentage !== null) {
+                      · {{ r.pregnancy.percentage | number: '1.0-2' }} %
+                    }
+                  </p>
+                  <p class="mt-2 text-xs text-stone-500">
+                    {{ r.pregnancy.matings }} montas registradas
+                  </p>
+                </td>
+                <td class="p-4">
+                  <p>
+                    {{ r.followup.without_recorded_death }} / {{ r.followup.observable }}
+                    @if (r.followup.percentage !== null) {
+                      · {{ r.followup.percentage | number: '1.0-2' }} %
+                    }
+                  </p>
+                  <p class="mt-2 text-xs text-stone-500">
+                    {{ r.followup.deaths }} muertes/sacrificios antes de esa edad
+                  </p>
+                </td>
+                <td class="p-4">
+                  <button
+                    type="button"
+                    (click)="view(r)"
+                    class="whitespace-nowrap rounded-lg border border-stone-200 px-3 py-2 text-xs dark:border-white/15">
+                    Ver cálculo
+                  </button>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="5" class="p-8 text-center text-stone-500">
+                  No hay hembras para estos filtros.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (p.total > p.limit) {
+        <div class="mt-5 flex flex-wrap justify-end gap-4 text-xs">
+          <span>{{ p.offset + 1 }}–{{ p.offset + p.items.length }} de {{ p.total }}</span
+          ><button
+            type="button"
+            (click)="load(p.offset - p.limit)"
+            [disabled]="p.offset === 0"
+            class="disabled:opacity-40">
+            Anterior</button
+          ><button
+            type="button"
+            (click)="load(p.offset + p.limit)"
+            [disabled]="p.offset + p.limit >= p.total"
+            class="disabled:opacity-40">
+            Siguiente
+          </button>
+        </div>
+      }
+      <section
+        class="mt-7 space-y-3 border-t border-stone-200 pt-5 text-xs leading-6 text-stone-500 dark:border-white/10">
+        <h2 class="text-sm font-medium text-stone-900 dark:text-stone-100">
+          Cómo leer los resultados
+        </h2>
+        <p>
+          Entre partos: promedio de días entre partos consecutivos registrados. El segundo debe
+          estar en el periodo; el anterior puede quedar fuera. Un parto sin antecedente no forma un
+          intervalo.
+        </p>
+        <p>
+          Gestantes: gestantes ÷ (gestantes + vacías) × 100, usando el último diagnóstico vinculado
+          a cada monta hasta el corte. Dudosos y montas sin diagnóstico quedan fuera del porcentaje.
+          No es una tasa de fertilidad biológica.
+        </p>
+        <p>
+          Crías: sin muerte registrada ÷ (sin muerte registrada + muertes/sacrificios) × 100, a la
+          edad elegida. Solo usa nacidas vivas conocidas que ya cumplen esa edad al corte. Las
+          salidas previas por venta u otro motivo se muestran aparte; no se suponen vivas ni
+          muertas. No tener una muerte registrada no confirma supervivencia real.
+        </p>
+        <p>
+          Los resultados dependen de la genealogía actual y los registros efectivos. Los totales
+          incluyen todas las páginas; los porcentajes usan las sumas de sus bases, no el promedio de
+          porcentajes individuales.
+        </p>
+      </section>
+    }
+  }
+}
+@if (selected(); as row) {
+  <app-detail-page title="Detalle del cálculo" (dismiss)="closeDetail()"
+    ><p class="text-lg font-medium">{{ label(row.animal) }}</p>
+    <div class="my-5 flex flex-wrap gap-4 border-b border-stone-200 text-xs dark:border-white/10">
+      <button
+        type="button"
+        (click)="switchSection('birth_intervals')"
+        [attr.aria-pressed]="section() === 'birth_intervals'"
+        class="border-b-2 border-transparent py-3"
+        [class.border-green-800]="section() === 'birth_intervals'">
+        Entre partos</button
+      ><button
+        type="button"
+        (click)="switchSection('matings')"
+        [attr.aria-pressed]="section() === 'matings'"
+        class="border-b-2 border-transparent py-3"
+        [class.border-green-800]="section() === 'matings'">
+        Montas y diagnósticos</button
+      ><button
+        type="button"
+        (click)="switchSection('offspring')"
+        [attr.aria-pressed]="section() === 'offspring'"
+        class="border-b-2 border-transparent py-3"
+        [class.border-green-800]="section() === 'offspring'">
+        Crías por edad
+      </button>
+    </div>
+    @if (detailLoading()) {
+      <p role="status" class="py-6 text-xs text-stone-500">Consultando registros…</p>
+    } @else if (detailError()) {
+      <p role="alert" class="text-sm text-red-700 dark:text-red-300">
+        {{ detailError() }}
+        <button type="button" (click)="loadDetail()" class="underline">Reintentar</button>
+      </p>
+    } @else if (detail(); as d) {
+      <p class="mb-5 text-xs leading-5 text-stone-500">
+        Corte: {{ d.as_of | date: 'dd/MM/yyyy' : 'UTC' }} · Periodo:
+        {{ d.date_from ? (d.date_from | date: 'dd/MM/yyyy' : 'UTC') : 'Primer registro' }} —
+        {{ d.date_to || d.as_of | date: 'dd/MM/yyyy' : 'UTC' }}
+      </p>
+      @if (d.section === 'matings') {
+        <p class="mb-5 text-xs leading-6 text-stone-500">
+          {{ d.parent.pregnancy.unlinked_diagnoses }} diagnósticos del periodo sin vínculo válido a
+          una monta: excluidos del porcentaje.
+        </p>
+        <p class="mb-5 text-xs leading-6">
+          Monta a primer diagnóstico gestante vinculado:
+          {{
+            d.parent.pregnancy.first_positive_delay.average_days !== null
+              ? (d.parent.pregnancy.first_positive_delay.average_days | number: '1.0-2') + ' días'
+              : 'Sin base'
+          }}
+          · {{ d.parent.pregnancy.first_positive_delay.count }} registros. Es tiempo entre
+          registros; no duración de gestación ni fecha de concepción.
+        </p>
+      }
+      @if (d.section === 'offspring') {
+        <div class="mb-5 space-y-2 text-xs leading-5">
+          <p>
+            Edad evaluada: {{ d.age_days }} días · Base:
+            {{ d.parent.followup.without_recorded_death }} / {{ d.parent.followup.observable }}
+          </p>
+          <p class="text-stone-500">
+            Fuera del cálculo: {{ d.parent.followup.stillbirths }} sin vida al nacer ·
+            {{ d.parent.followup.unknown_birth_condition }} con condición al nacer desconocida ·
+            {{ d.parent.followup.missing_birth_date }} sin fecha ·
+            {{ d.parent.followup.too_young }} aún sin edad ·
+            {{ d.parent.followup.unobservable }} salidas tempranas.
+          </p>
+        </div>
+      }
+      <ol class="divide-y divide-stone-200 dark:divide-white/10">
+        @for (item of d.items; track $index) {
+          <li class="py-4" data-indicator-detail>
+            @if (d.section === 'birth_intervals') {
+              <p class="text-sm font-medium">{{ item.days }} días</p>
+              <p class="mt-2 text-xs">
+                {{ item.previous_date | date: 'dd/MM/yyyy' : 'UTC' }} →
+                {{ item.date | date: 'dd/MM/yyyy' : 'UTC' }}
+              </p>
+              @if (item.predecessor_outside_period) {
+                <p class="mt-2 text-xs text-stone-500">
+                  El parto anterior queda fuera del periodo y se conserva como antecedente.
+                </p>
+              }
+            } @else if (d.section === 'matings') {
+              <p class="text-sm font-medium">Monta: {{ item.date | date: 'dd/MM/yyyy' : 'UTC' }}</p>
+              <p class="mt-2 text-xs">
+                {{ diagnosisLabel(item.result) }}
+                @if (item.diagnosis_date) {
+                  · {{ item.diagnosis_date | date: 'dd/MM/yyyy' : 'UTC' }}
+                }
+              </p>
+              @if (item.first_positive_days !== null && item.first_positive_days !== undefined) {
+                <p class="mt-2 text-xs text-stone-500">
+                  Primer diagnóstico gestante vinculado:
+                  {{ item.first_positive_date | date: 'dd/MM/yyyy' : 'UTC' }} ·
+                  {{ item.first_positive_days }} días después de la monta
+                </p>
+              }
+            } @else {
+              <p class="text-sm font-medium">{{ item.animal ? label(item.animal) : 'Cría' }}</p>
+              <p class="mt-2 text-xs leading-5">{{ followupLabel(item.state) }}</p>
+              <p class="mt-2 text-xs text-stone-500">
+                Nacimiento:
+                {{ item.birth_date ? (item.birth_date | date: 'dd/MM/yyyy' : 'UTC') : 'Sin fecha' }}
+              </p>
+              @if (item.target_date) {
+                <p class="mt-2 text-xs text-stone-500">
+                  Cumple {{ d.age_days }} días: {{ item.target_date | date: 'dd/MM/yyyy' : 'UTC' }}
+                </p>
+              }
+              @if (item.exit_date) {
+                <p class="mt-2 text-xs text-stone-500">
+                  Salida registrada: {{ item.exit_date | date: 'dd/MM/yyyy' : 'UTC' }}
+                </p>
+              }
+            }
+          </li>
+        } @empty {
+          <li class="py-6 text-xs text-stone-500">Sin registros para esta sección y periodo.</li>
+        }
+      </ol>
+      @if (d.total > d.limit) {
+        <div class="mt-5 flex flex-wrap justify-end gap-4 text-xs">
+          <span>{{ d.offset + 1 }}–{{ d.offset + d.items.length }} de {{ d.total }}</span
+          ><button
+            type="button"
+            (click)="loadDetail(d.offset - d.limit)"
+            [disabled]="d.offset === 0"
+            class="disabled:opacity-40">
+            Anterior</button
+          ><button
+            type="button"
+            (click)="loadDetail(d.offset + d.limit)"
+            [disabled]="d.offset + d.limit >= d.total"
+            class="disabled:opacity-40">
+            Siguiente
+          </button>
+        </div>
+      }
+    }
+  </app-detail-page>
+}

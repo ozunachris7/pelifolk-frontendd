@@ -1,0 +1,487 @@
+@if (!selected()) {
+  <section class="mx-auto max-w-6xl">
+    <p class="mb-3 text-xs text-stone-500">Mi rancho / Reproducción / Desempeño</p>
+    <h1 class="text-2xl font-semibold tracking-tight">Desempeño de reproductores</h1>
+    <p class="mt-2 text-sm text-stone-500">
+      Compara los resultados registrados de las hembras y los machos del rancho.
+    </p>
+    <nav
+      aria-label="Reproducción"
+      class="my-7 flex flex-wrap gap-6 border-b border-stone-200 text-sm dark:border-white/10">
+      <a routerLink="/dashboard/breeding" class="pb-3 text-stone-500">Registros reproductivos</a
+      ><a routerLink="/dashboard/breeding/upcoming-births" class="pb-3 text-stone-500"
+        >Partos próximos</a
+      ><span class="border-b-2 border-green-800 pb-3 dark:border-green-400" aria-current="page"
+        >Desempeño</span
+      >
+      <a
+        routerLink="/dashboard/breeding/assessments"
+        class="border-b-2 border-transparent py-3 text-sm text-stone-500"
+        >Evaluaciones maternas y de crías</a
+      >
+      <a
+        routerLink="/dashboard/breeding/indicators"
+        class="border-b-2 border-transparent py-3 text-sm text-stone-500"
+        >Indicadores</a
+      >
+    </nav>
+    @if (!allowed) {
+      <p class="py-12 text-sm text-stone-500">No tienes permiso para consultar Reproducción.</p>
+    } @else {
+      <div class="mb-6 flex gap-6 text-sm">
+        @for (s of ['female', 'male']; track s) {
+          <button
+            type="button"
+            [attr.data-performance-sex]="s"
+            [attr.aria-pressed]="sex() === s"
+            (click)="switchSex(s)"
+            class="border-b-2 border-transparent pb-2"
+            [class.border-green-800]="sex() === s"
+            [class.dark:border-green-400]="sex() === s">
+            {{ s === 'female' ? 'Hembras' : 'Machos' }}
+          </button>
+        }
+      </div>
+      <form
+        [formGroup]="form"
+        (ngSubmit)="search()"
+        class="grid grid-cols-1 gap-4 border-b border-stone-200 pb-6 sm:grid-cols-2 lg:grid-cols-4 dark:border-white/10">
+        <div class="min-w-0">
+          <label for="performance-q" class="mb-2 block text-xs"
+            >Nombre o SINIIGA del reproductor</label
+          ><input
+            id="performance-q"
+            formControlName="q"
+            maxlength="100"
+            class="w-full min-w-0 rounded-lg border border-stone-300 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+        </div>
+        <div class="min-w-0">
+          <label for="performance-status" class="mb-2 block text-xs">Estado actual</label
+          ><select
+            id="performance-status"
+            formControlName="status"
+            class="w-full min-w-0 rounded-lg border border-stone-300 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-stone-900">
+            <option value="all">Activos y con salida</option>
+            <option value="active">En el hato</option>
+            <option value="exited">Con salida</option>
+          </select>
+        </div>
+        <div class="min-w-0">
+          <label for="performance-from" class="mb-2 block text-xs">Desde</label
+          ><input
+            id="performance-from"
+            type="date"
+            formControlName="date_from"
+            class="w-full min-w-0 rounded-lg border border-stone-300 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+        </div>
+        <div class="min-w-0">
+          <label for="performance-to" class="mb-2 block text-xs">Hasta</label
+          ><input
+            id="performance-to"
+            type="date"
+            formControlName="date_to"
+            class="w-full min-w-0 rounded-lg border border-stone-300 bg-transparent px-3 py-3 text-sm dark:border-white/15" />
+        </div>
+        <div class="flex flex-wrap items-center gap-5 sm:col-span-2 lg:col-span-4">
+          <button
+            type="submit"
+            [disabled]="loading()"
+            class="rounded-lg border border-stone-300 px-4 py-2 text-xs disabled:opacity-50 dark:border-white/15">
+            Aplicar filtros</button
+          ><button
+            type="button"
+            (click)="reset()"
+            class="text-xs text-stone-500 underline underline-offset-4">
+            Limpiar filtros
+          </button>
+          <p class="text-xs text-stone-500">Sin fechas se consulta todo el historial.</p>
+        </div>
+      </form>
+      @if (error()) {
+        <p role="alert" class="mt-5 text-sm text-red-700 dark:text-red-400">
+          {{ error() }} <button type="button" (click)="load()" class="underline">Reintentar</button>
+        </p>
+      }
+      @if (loading()) {
+        <p role="status" class="py-12 text-sm text-stone-500">Cargando desempeño…</p>
+      } @else if (!error()) {
+        <div class="my-6 flex flex-wrap justify-between gap-3 text-xs text-stone-500">
+          <p>
+            {{ page().total }}
+            {{
+              page().sex === 'female'
+                ? page().total === 1
+                  ? 'hembra'
+                  : 'hembras'
+                : page().total === 1
+                  ? 'macho'
+                  : 'machos'
+            }}
+            ·
+            {{
+              page().date_from ? (page().date_from | date: 'dd/MM/yyyy') : 'Inicio del historial'
+            }}
+            — {{ page().date_to ? (page().date_to | date: 'dd/MM/yyyy') : 'Sin límite' }}
+          </p>
+          <p>Estado de las crías al {{ page().as_of | date: 'dd/MM/yyyy' }}</p>
+        </div>
+        <div
+          data-testid="performance-summary"
+          class="mb-6 grid grid-cols-2 gap-x-6 gap-y-5 border-b border-stone-200 pb-6 sm:grid-cols-4 dark:border-white/10">
+          <div>
+            <h2 class="text-xs text-stone-500">Descendientes registrados</h2>
+            <p class="mt-2 text-2xl font-semibold">{{ page().summary['offspring'] || 0 }}</p>
+          </div>
+          <div>
+            <h2 class="text-xs text-stone-500">Nacidos vivos</h2>
+            <p class="mt-2 text-2xl font-semibold">{{ page().summary['live_births'] || 0 }}</p>
+          </div>
+          <div>
+            <h2 class="text-xs text-stone-500">Nacidos sin vida</h2>
+            <p class="mt-2 text-2xl font-semibold">{{ page().summary['stillbirths'] || 0 }}</p>
+          </div>
+          <div>
+            <h2 class="text-xs text-stone-500">Muertes posteriores registradas</h2>
+            <p class="mt-2 text-2xl font-semibold">
+              {{ page().summary['post_birth_deaths'] || 0 }}
+            </p>
+          </div>
+        </div>
+        @if (canHealth) {
+          @if (page().health_summary; as h) {
+            <section
+              aria-label="Salud registrada de las crías"
+              class="mb-6 border-b border-stone-200 pb-5 dark:border-white/10"
+              data-offspring-health-summary>
+              <h2 class="text-sm font-medium">Salud registrada de las crías</h2>
+              <p class="mt-3 text-sm">
+                {{ h.offspring_with_cases }} con casos · {{ h.offspring_without_cases }} sin casos
+                registrados · {{ h.total_cases }} casos en total
+              </p>
+              <p class="mt-2 text-xs text-stone-500">
+                {{ h.open_cases }} abiertos · {{ h.under_treatment_cases }} en tratamiento ·
+                {{ h.closed_cases }} cerrados
+              </p>
+              <p class="mt-3 text-xs leading-5 text-stone-500">
+                Se seleccionan las crías por su nacimiento en el periodo y se consultan sus casos
+                hasta hoy, incluso si salieron del hato. Sin casos registrados no significa sana;
+                estos conteos no establecen una causa hereditaria.
+              </p>
+            </section>
+          }
+        }
+        <p class="mb-3 text-xs leading-relaxed text-stone-500">
+          Las fechas filtran montas y partos por fecha del evento, y descendientes por nacimiento.
+          Las crías sin fecha de nacimiento solo aparecen cuando no hay rango. Incluye reproductores
+          marcados y animales con reproducción o descendencia registrada, aunque tengan cero
+          resultados en el período. Los totales incluyen todas las páginas.
+        </p>
+        <p class="mb-6 text-xs leading-relaxed text-stone-500">
+          Nacer vivo no indica supervivencia actual. Las muertes posteriores incluyen muerte o
+          sacrificio de crías nacidas vivas, hasta la fecha de consulta; las ventas y otras salidas
+          se muestran por separado. El promedio al nacer usa solo pesos al nacimiento registrados,
+          incluidos nacidos sin vida. Estos datos no representan una evaluación genética ni una tasa
+          de fertilidad.
+        </p>
+        <p class="mb-5 text-xs leading-relaxed text-stone-500">
+          El promedio al destete usa únicamente destetes registrados de los descendientes del
+          período, incluso si ocurrieron después de ese período o la cría salió del hato. Se agrupan
+          por los padres de la genealogía actual. No se ajustan los pesos a una edad común; consulta
+          las edades individuales en Ver crías.
+        </p>
+        <div
+          class="min-w-0 overflow-x-auto rounded-xl border border-stone-200 dark:border-white/10">
+          <table class="w-full min-w-[1450px] text-left text-sm">
+            <thead class="bg-stone-50 text-xs text-stone-500 dark:bg-white/5">
+              <tr>
+                <th class="p-4 font-normal">{{ page().sex === 'female' ? 'Hembra' : 'Macho' }}</th>
+                <th class="p-4 text-right font-normal">Montas</th>
+                <th class="p-4 text-right font-normal">
+                  {{ page().sex === 'female' ? 'Partos registrados' : 'Partos con descendencia' }}
+                </th>
+                <th class="p-4 text-right font-normal">Descendientes</th>
+                <th class="p-4 text-right font-normal">Vivos / sin vida al nacer</th>
+                <th class="p-4 text-right font-normal">Muertes posteriores</th>
+                <th class="p-4 text-right font-normal">
+                  {{ page().sex === 'female' ? 'Crías / parto registrado' : 'Crías en el hato' }}
+                </th>
+                <th class="p-4 text-right font-normal">Peso promedio al nacer</th>
+                <th class="p-4 text-right font-normal">Peso promedio al destete</th>
+                @if (canHealth) {
+                  <th class="p-4 font-normal">Casos de las crías</th>
+                }
+                <th
+                  class="sticky right-0 z-10 w-[156px] border-l border-stone-200 bg-stone-50 px-4 py-4 text-center font-normal dark:border-white/10 dark:bg-stone-900">
+                  Acciones
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (m of page().items; track m.animal.id) {
+                <tr
+                  data-performance-row
+                  class="border-t border-stone-200 align-top dark:border-white/10">
+                  <td class="p-4">
+                    <p class="font-medium">{{ m.animal.name || m.animal.siniiga }}</p>
+                    <p class="mt-1 text-xs text-stone-500">
+                      {{ m.animal.name ? m.animal.siniiga : '' }}
+                    </p>
+                    <p class="mt-1 text-xs text-stone-500">
+                      {{ statusLabel(m.status) }}{{ m.is_breeder ? ' · Marcado reproductor' : '' }}
+                    </p>
+                  </td>
+                  <td class="p-4 text-right tabular-nums">{{ m.matings }}</td>
+                  <td class="p-4 text-right tabular-nums">{{ m.births }}</td>
+                  <td class="p-4 text-right tabular-nums">{{ m.offspring }}</td>
+                  <td class="p-4 text-right">
+                    <p class="whitespace-nowrap tabular-nums">
+                      {{ m.live_births }} / {{ m.stillbirths }}
+                    </p>
+                    @if (m.unknown_birth_condition) {
+                      <p class="mt-1 text-xs text-stone-500">
+                        {{ m.unknown_birth_condition }} sin condición registrada
+                      </p>
+                    }
+                  </td>
+                  <td class="p-4 text-right tabular-nums">{{ m.post_birth_deaths }}</td>
+                  <td class="p-4 text-right tabular-nums">
+                    @if (page().sex === 'female') {
+                      {{
+                        m.offspring_per_recorded_birth !== null
+                          ? (m.offspring_per_recorded_birth | number: '1.2-2')
+                          : '—'
+                      }}
+                    } @else {
+                      {{ m.in_herd }}
+                    }
+                  </td>
+                  <td class="p-4 text-right">
+                    @if (m.average_birth_weight_kg !== null) {
+                      <p class="whitespace-nowrap tabular-nums">
+                        {{ m.average_birth_weight_kg | number: '1.2-2' }} kg
+                      </p>
+                      <p class="mt-1 text-xs text-stone-500">{{ m.weighed_offspring }} con peso</p>
+                    } @else {
+                      <span class="text-xs text-stone-500">Sin pesos registrados</span>
+                    }
+                  </td>
+                  <td class="p-4 text-right" data-weaning-metric>
+                    @if (m.average_weaning_weight_kg !== null) {
+                      <p class="whitespace-nowrap tabular-nums">
+                        {{ m.average_weaning_weight_kg | number: '1.2-2' }} kg
+                      </p>
+                      <p class="mt-1 text-xs text-stone-500">
+                        {{ m.weaned_offspring }} con destete registrado
+                      </p>
+                    } @else {
+                      <span class="text-xs text-stone-500">Sin destetes registrados</span>
+                    }
+                  </td>
+                  @if (canHealth) {
+                    <td class="p-4" data-parent-child-health>
+                      @if (m.health; as h) {
+                        <p class="text-sm">{{ h.total_cases }} casos</p>
+                        <p class="mt-2 text-xs text-stone-500">
+                          {{ h.offspring_with_cases }} crías con casos
+                        </p>
+                        <p class="mt-1 text-xs text-stone-500">
+                          {{ h.open_cases + h.under_treatment_cases }} sin cerrar
+                        </p>
+                      } @else {
+                        <span class="text-xs text-stone-500">Sin información disponible</span>
+                      }
+                    </td>
+                  }
+                  <td
+                    class="sticky right-0 z-10 border-l border-stone-200 bg-white px-4 py-4 align-middle dark:border-white/10 dark:bg-[#101010]"
+                    data-performance-actions>
+                    <div
+                      role="group"
+                      [attr.aria-label]="'Acciones de ' + label(m.animal)"
+                      class="flex items-center justify-center gap-1">
+                      <button
+                        type="button"
+                        (click)="showChildren(m)"
+                        [attr.aria-label]="'Ver crías de ' + label(m.animal)"
+                        title="Ver crías"
+                        class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-stone-200 text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-500 dark:border-white/15 dark:text-stone-300 dark:hover:bg-white/10 dark:hover:text-white">
+                        <lucide-icon [img]="babyIcon" [size]="17" aria-hidden="true" />
+                      </button>
+                      @if (page().sex === 'female') {
+                        <a
+                          routerLink="/dashboard/breeding/indicators"
+                          [queryParams]="{ animal_id: m.animal.id }"
+                          [attr.aria-label]="'Ver indicadores de ' + label(m.animal)"
+                          title="Ver indicadores"
+                          class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-stone-200 text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-500 dark:border-white/15 dark:text-stone-300 dark:hover:bg-white/10 dark:hover:text-white">
+                          <lucide-icon [img]="indicatorsIcon" [size]="17" aria-hidden="true" />
+                        </a>
+                      }
+                      <a
+                        routerLink="/dashboard/breeding/assessments"
+                        [queryParams]="{ animal_id: m.animal.id }"
+                        [attr.aria-label]="'Ver evaluaciones de ' + label(m.animal)"
+                        title="Ver evaluaciones"
+                        class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-stone-200 text-stone-600 transition-colors hover:bg-stone-100 hover:text-stone-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-500 dark:border-white/15 dark:text-stone-300 dark:hover:bg-white/10 dark:hover:text-white">
+                        <lucide-icon [img]="evaluationsIcon" [size]="17" aria-hidden="true" />
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td [attr.colspan]="canHealth ? 11 : 10" class="p-10 text-center text-stone-500">
+                    No hay reproductores que coincidan con los filtros.
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-5 flex flex-wrap justify-end gap-5 text-xs text-stone-500">
+          <span
+            >{{ page().total ? page().offset + 1 : 0 }}–{{ page().offset + page().items.length }} de
+            {{ page().total }}</span
+          ><button
+            type="button"
+            (click)="load(page().offset - page().limit)"
+            [disabled]="page().offset === 0"
+            class="disabled:opacity-40">
+            Anterior</button
+          ><button
+            type="button"
+            (click)="load(page().offset + page().limit)"
+            [disabled]="page().offset + page().limit >= page().total"
+            class="disabled:opacity-40">
+            Siguiente
+          </button>
+        </div>
+      }
+    }
+  </section>
+}
+@if (selected(); as m) {
+  <app-detail-page title="Descendientes registrados" (dismiss)="closeChildren()"
+    ><h3 class="mb-2 text-lg font-medium">{{ label(m.animal) }}</h3>
+    <p class="mb-6 text-xs text-stone-500">
+      Hijos directos del período aplicado. La condición al nacer y el estado actual son datos
+      distintos.
+    </p>
+    @if (childLoading()) {
+      <p role="status" class="py-8 text-sm text-stone-500">Cargando crías…</p>
+    }
+    @if (childError()) {
+      <p role="alert" class="text-sm text-red-700 dark:text-red-400">
+        {{ childError() }}
+        <button type="button" (click)="loadChildren()" class="underline">Reintentar</button>
+      </p>
+    }
+    @if (children(); as p) {
+      <p class="mb-5 text-xs text-stone-500">
+        {{ p.parent.in_herd }} en el hato · {{ p.parent.other_exits }} con otras salidas · estado al
+        {{ p.as_of | date: 'dd/MM/yyyy' }}
+      </p>
+      <ol class="space-y-5 border-l border-stone-200 pl-4 dark:border-white/10">
+        @for (c of p.items; track c.animal.id) {
+          <li data-performance-child>
+            <h4 class="text-sm font-medium">{{ label(c.animal) }}</h4>
+            <p class="mt-2 text-xs text-stone-500">
+              {{ c.animal.sex === 'female' ? 'Hembra' : 'Macho' }} ·
+              {{ c.birth_date ? (c.birth_date | date: 'dd/MM/yyyy') : 'Nacimiento sin fecha' }}
+            </p>
+            <p class="mt-2 text-xs">
+              {{
+                c.born_alive === true
+                  ? 'Nació viva'
+                  : c.born_alive === false
+                    ? 'Nació sin vida'
+                    : 'Condición al nacer sin registro'
+              }}
+              ·
+              {{
+                c.birth_weight_kg !== null
+                  ? (c.birth_weight_kg | number: '1.2-2') + ' kg al nacer'
+                  : 'Sin peso al nacer'
+              }}
+            </p>
+            <p class="mt-2 text-xs text-stone-500">
+              Estado actual: {{ statusLabel(c.status) }}
+              @if (c.exit_date) {
+                · {{ c.exit_date | date: 'dd/MM/yyyy' }}
+              }
+            </p>
+            @if (c.weaning; as w) {
+              <div
+                class="mt-3 border-l-2 border-stone-300 pl-3 text-xs dark:border-white/20"
+                data-child-weaning>
+                <p>
+                  Destete: {{ w.date | date: 'dd/MM/yyyy' : 'UTC' }} ·
+                  {{ w.weight_kg | number: '1.2-2' }} kg
+                </p>
+                <p class="mt-1 text-stone-500">
+                  Edad al registrar:
+                  {{ w.age_days !== null ? w.age_days + ' días' : 'Desconocida' }}
+                </p>
+              </div>
+            } @else {
+              <p class="mt-3 text-xs text-stone-500">Sin destete registrado.</p>
+            }
+            @if (canHealth) {
+              <section
+                class="mt-4 border-t border-stone-200 pt-3 dark:border-white/10"
+                aria-label="Casos registrados de la cría">
+                @if (c.health; as h) {
+                  <p class="text-xs">
+                    Casos sanitarios: {{ h.total_cases }} · {{ h.open_cases }} abiertos ·
+                    {{ h.under_treatment_cases }} en tratamiento · {{ h.closed_cases }} cerrados
+                  </p>
+                  @if (h.total_cases === 0) {
+                    <p class="mt-2 text-xs text-stone-500">
+                      Sin casos registrados; no confirma ausencia de problemas sanitarios.
+                    </p>
+                  }
+                  <app-offspring-health
+                    [parentId]="m.animal.id"
+                    [animalId]="c.animal.id"
+                    [dateFrom]="p.date_from"
+                    [dateTo]="p.date_to" />
+                } @else {
+                  <p class="text-xs text-stone-500">Información sanitaria no disponible.</p>
+                }
+              </section>
+            }
+            @if (canGenealogy) {
+              <a
+                [routerLink]="['/dashboard/genealogy', c.animal.id]"
+                class="mt-3 inline-block text-xs underline underline-offset-4"
+                >Ver genealogía</a
+              >
+            }
+          </li>
+        } @empty {
+          <li class="py-6 text-sm text-stone-500">
+            No hay descendientes registrados en el período.
+          </li>
+        }
+      </ol>
+      @if (p.total > p.limit) {
+        <div class="mt-6 flex flex-wrap justify-end gap-4 text-xs text-stone-500">
+          <span>{{ p.offset + 1 }}–{{ p.offset + p.items.length }} de {{ p.total }}</span
+          ><button
+            type="button"
+            (click)="loadChildren(p.offset - p.limit)"
+            [disabled]="p.offset === 0"
+            class="disabled:opacity-40">
+            Anterior</button
+          ><button
+            type="button"
+            (click)="loadChildren(p.offset + p.limit)"
+            [disabled]="p.offset + p.limit >= p.total"
+            class="disabled:opacity-40">
+            Siguiente
+          </button>
+        </div>
+      }
+    }
+  </app-detail-page>
+}

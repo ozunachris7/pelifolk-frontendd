@@ -1,0 +1,886 @@
+@if (!(detailOpen() || historyOpen())) {
+  <div class="mx-auto max-w-6xl">
+    <div class="flex flex-wrap items-end justify-between gap-5 pb-7">
+      <div>
+        <p class="mb-3 text-xs text-stone-500">Mi rancho / Sanidad</p>
+        <h1 class="text-2xl font-medium tracking-tight sm:text-3xl">Sanidad</h1>
+        <p class="mt-3 text-sm text-stone-500">
+          Observaciones y seguimiento de los casos del hato.
+        </p>
+      </div>
+      @if (canObserve() || canCases()) {
+        <div class="flex flex-wrap gap-2">
+          @if (canObserve()) {
+            <button
+              type="button"
+              data-testid="new-observation"
+              (click)="openForm('observation')"
+              class="inline-flex items-center gap-2 rounded-lg border border-stone-200 px-4 py-3 text-xs dark:border-white/15">
+              <lucide-icon [img]="plus" [size]="16" /> Observación
+            </button>
+          }
+          @if (canCases()) {
+            <button
+              type="button"
+              data-testid="new-case"
+              (click)="openForm('case')"
+              class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950 inline-flex items-center gap-2">
+              <lucide-icon [img]="plus" [size]="16" /> Abrir caso
+            </button>
+          }
+        </div>
+      }
+    </div>
+    <app-health-nav />
+    @if (success()) {
+      <p
+        role="status"
+        class="mb-5 rounded-lg bg-green-50 p-4 text-sm text-green-900 dark:bg-green-950/30 dark:text-green-200">
+        {{ success() }}
+      </p>
+    }
+    @if (!canRead()) {
+      <p class="py-10 text-sm text-stone-500">No tienes permiso para consultar Sanidad.</p>
+    } @else {
+      <div class="mb-6 flex gap-5 border-b border-stone-200 text-sm dark:border-white/10">
+        <button
+          type="button"
+          data-testid="cases-tab"
+          (click)="switchTab('cases')"
+          [attr.aria-pressed]="tab() === 'cases'"
+          [class.border-green-800]="tab() === 'cases'"
+          class="border-b-2 border-transparent py-3">
+          Casos sanitarios</button
+        ><button
+          type="button"
+          data-testid="observations-tab"
+          (click)="switchTab('observations')"
+          [attr.aria-pressed]="tab() === 'observations'"
+          [class.border-green-800]="tab() === 'observations'"
+          class="border-b-2 border-transparent py-3">
+          Observaciones
+        </button>
+      </div>
+      <form (submit)="$event.preventDefault(); load()" class="mb-6 flex flex-wrap items-end gap-3">
+        <div class="min-w-0 max-w-md flex-1 basis-52">
+          <label for="health-search" class="mb-2 block text-xs">Buscar animal</label
+          ><input
+            id="health-search"
+            type="search"
+            placeholder="Nombre o SINIIGA"
+            [value]="search()"
+            (input)="search.set($any($event.target).value)"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]" />
+        </div>
+        @if (tab() === 'cases') {
+          <div>
+            <label for="case-status-filter" class="mb-2 block text-xs">Estado</label
+            ><select
+              id="case-status-filter"
+              [value]="status()"
+              (change)="status.set($any($event.target).value); load()"
+              class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+              <option value="">Todos</option>
+              <option value="open">Abiertos</option>
+              <option value="under_treatment">En tratamiento</option>
+              <option value="closed">Cerrados</option>
+            </select>
+          </div>
+        }
+        <button
+          type="submit"
+          class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950"
+          [disabled]="loading()">
+          Buscar
+        </button>
+      </form>
+      @if (error()) {
+        <p role="alert" class="mb-3 text-sm text-red-600">{{ error() }}</p>
+        <button type="button" (click)="load(page().offset)" class="text-sm underline">
+          Reintentar
+        </button>
+      }
+      @if (loading()) {
+        <p role="status" class="py-12 text-sm text-stone-500">Cargando registros…</p>
+      } @else if (!error()) {
+        <div class="overflow-x-auto rounded-xl border border-stone-200 dark:border-white/10">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-stone-50 text-xs text-stone-500 dark:bg-white/5">
+              <tr>
+                <th class="p-4 font-normal">Animal</th>
+                <th class="p-4 font-normal">
+                  {{ tab() === 'cases' ? 'Motivo' : 'Observación' }}
+                </th>
+                <th class="p-4 font-normal">Fecha</th>
+                <th class="p-4 font-normal">
+                  {{ tab() === 'cases' ? 'Estado' : 'Registró' }}
+                </th>
+                <th class="p-4 font-normal">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              @if (tab() === 'cases') {
+                @for (case of cases().items; track case.id) {
+                  <tr
+                    [attr.data-case-id]="case.id"
+                    class="border-t border-stone-100 dark:border-white/10">
+                    <td class="p-4">
+                      <button
+                        type="button"
+                        (click)="openDetail(case.id)"
+                        class="text-left font-medium underline underline-offset-4"
+                        [attr.aria-label]="'Ver caso de ' + label(case.animal)">
+                        {{ case.animal.name || 'Sin nombre' }}
+                      </button>
+                      <p class="mt-1 text-xs text-stone-500">
+                        {{ case.animal.siniiga || 'Sin SINIIGA' }}
+                      </p>
+                    </td>
+                    <td class="max-w-xs break-words p-4">{{ case.reason }}</td>
+                    <td class="whitespace-nowrap p-4">
+                      {{ case.start_date | date: 'dd/MM/yyyy' : 'UTC' }}
+                    </td>
+                    <td class="whitespace-nowrap p-4">
+                      <span class="rounded-md bg-stone-100 px-2 py-1 text-xs dark:bg-white/5">{{
+                        statusLabel(case.status)
+                      }}</span>
+                    </td>
+                    <td class="p-4">
+                      <div class="flex gap-1">
+                        <button
+                          type="button"
+                          (click)="openDetail(case.id)"
+                          [attr.aria-label]="'Ver caso de ' + label(case.animal)"
+                          class="inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-xs font-medium hover:bg-stone-100 dark:hover:bg-white/5">
+                          <lucide-icon [img]="clipboard" [size]="18" aria-hidden="true" />
+                          Ver caso</button
+                        ><button
+                          type="button"
+                          (click)="openHistory(case.animal)"
+                          [attr.aria-label]="'Historial sanitario de ' + label(case.animal)"
+                          class="rounded-lg p-2 text-stone-500 hover:bg-stone-100 dark:hover:bg-white/5">
+                          <lucide-icon [img]="historyIcon" [size]="18" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="5" class="p-12 text-center text-stone-500">
+                      No hay casos sanitarios para estos filtros.
+                    </td>
+                  </tr>
+                }
+              } @else {
+                @for (observation of observations().items; track observation.id) {
+                  <tr
+                    [attr.data-observation-id]="observation.id"
+                    class="border-t border-stone-100 dark:border-white/10">
+                    <td class="p-4">
+                      <p class="font-medium">
+                        {{ observation.animal.name || 'Sin nombre' }}
+                      </p>
+                      <p class="mt-1 text-xs text-stone-500">
+                        {{ observation.animal.siniiga || 'Sin SINIIGA' }}
+                      </p>
+                    </td>
+                    <td class="max-w-sm p-4">
+                      <p class="line-clamp-3 break-words whitespace-pre-wrap">
+                        {{ observation.observation }}
+                      </p>
+                    </td>
+                    <td class="whitespace-nowrap p-4">
+                      {{ observation.date | date: 'dd/MM/yyyy' : 'UTC' }}
+                    </td>
+                    <td class="p-4 text-stone-500">{{ observation.recorded_by }}</td>
+                    <td class="p-4">
+                      @if (observation.health_case; as linked) {
+                        <button
+                          type="button"
+                          (click)="openDetail(linked.id)"
+                          class="mr-2 inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-2 text-xs dark:border-white/15">
+                          <lucide-icon [img]="clipboard" [size]="15" />Ver caso
+                        </button>
+                      } @else if (canCases()) {
+                        <button
+                          type="button"
+                          (click)="sourceObservation.set(observation)"
+                          data-attend-observation
+                          class="mr-2 inline-flex items-center gap-1.5 rounded-lg border border-stone-200 px-3 py-2 text-xs dark:border-white/15">
+                          <lucide-icon [img]="clipboard" [size]="15" />Atender hallazgo
+                        </button>
+                      }
+                      <button
+                        type="button"
+                        (click)="openHistory(observation.animal)"
+                        [attr.aria-label]="'Historial sanitario de ' + label(observation.animal)"
+                        class="rounded-lg p-2 text-green-900 hover:bg-stone-100 dark:text-green-300 dark:hover:bg-white/5">
+                        <lucide-icon [img]="historyIcon" [size]="18" />
+                      </button>
+                    </td>
+                  </tr>
+                } @empty {
+                  <tr>
+                    <td colspan="5" class="p-12 text-center text-stone-500">
+                      No hay observaciones para estos filtros.
+                    </td>
+                  </tr>
+                }
+              }
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-stone-500">
+          <p>{{ page().total }} registros</p>
+          <div class="flex gap-3">
+            <button
+              type="button"
+              [disabled]="page().offset === 0"
+              (click)="load(page().offset - 25)"
+              class="rounded-lg border border-stone-200 px-3 py-2 disabled:opacity-40 dark:border-white/10">
+              Anterior</button
+            ><button
+              type="button"
+              [disabled]="page().offset + 25 >= page().total"
+              (click)="load(page().offset + 25)"
+              class="rounded-lg border border-stone-200 px-3 py-2 disabled:opacity-40 dark:border-white/10">
+              Siguiente
+            </button>
+          </div>
+        </div>
+      }
+    }
+  </div>
+}
+@if (formKind(); as kind) {
+  <app-modal
+    [title]="kind === 'case' ? 'Abrir caso sanitario' : 'Registrar observación'"
+    [busy]="busy()"
+    (dismiss)="closeForm()"
+    ><form [formGroup]="form" (ngSubmit)="save()">
+      <fieldset class="min-w-0 space-y-5" [disabled]="busy()">
+        <div>
+          <label for="health-animal-search" class="mb-2 block text-xs">Buscar animal</label>
+          <div class="flex gap-2">
+            <input
+              id="health-animal-search"
+              type="search"
+              [value]="optionSearch()"
+              (input)="optionSearch.set($any($event.target).value)"
+              placeholder="Nombre o SINIIGA"
+              class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717] min-w-0" /><button
+              type="button"
+              (click)="loadOptions()"
+              [disabled]="optionLoading()"
+              class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+              Buscar
+            </button>
+          </div>
+        </div>
+        @if (optionLoading()) {
+          <p role="status" class="text-xs text-stone-500">Cargando animales…</p>
+        }
+        @if (optionError()) {
+          <p role="alert" class="text-sm text-red-600">{{ optionError() }}</p>
+        }
+        <div>
+          <label for="health-animal" class="mb-2 block text-xs">Animal *</label
+          ><select
+            id="health-animal"
+            formControlName="animal_id"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+            <option value="">Selecciona un animal</option>
+            @for (animal of options(); track animal.id) {
+              <option [value]="animal.id">{{ label(animal) }}</option>
+            }
+          </select>
+          <p class="mt-2 text-xs text-stone-500">
+            Hasta 50 resultados. Busca por nombre o identificación para encontrar otros.
+          </p>
+        </div>
+        <div>
+          <label for="health-date" class="mb-2 block text-xs"
+            >{{ kind === 'case' ? 'Fecha de inicio' : 'Fecha' }} *</label
+          ><input
+            id="health-date"
+            type="date"
+            formControlName="date"
+            [max]="today"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717] min-w-0" />
+        </div>
+        <div>
+          <label for="health-text" class="mb-2 block text-xs"
+            >{{ kind === 'case' ? 'Motivo' : 'Observación' }} *</label
+          ><textarea
+            id="health-text"
+            formControlName="text"
+            [maxlength]="kind === 'case' ? 255 : 5000"
+            rows="4"
+            placeholder="Describe lo que observaste"
+            class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]"></textarea>
+        </div>
+        @if (kind === 'case') {
+          <div>
+            <label for="health-notes" class="mb-2 block text-xs">Notas iniciales</label
+            ><textarea
+              id="health-notes"
+              formControlName="notes"
+              maxlength="5000"
+              rows="3"
+              class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]"></textarea>
+          </div>
+          <p class="text-xs text-stone-500">El caso se creará como abierto.</p>
+        }
+        @if (form.invalid && form.touched) {
+          <p role="alert" class="text-sm text-red-600">
+            Selecciona un animal, una fecha y completa la descripción.
+          </p>
+        }
+        @if (formError()) {
+          <p role="alert" class="text-sm text-red-600">{{ formError() }}</p>
+        }
+        <div class="flex justify-end gap-3 border-t border-stone-200 pt-5 dark:border-white/10">
+          <button type="button" (click)="closeForm()" class="px-4 py-3 text-xs">Cancelar</button
+          ><button
+            type="submit"
+            class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+            {{ busy() ? 'Guardando…' : 'Guardar' }}
+          </button>
+        </div>
+      </fieldset>
+    </form></app-modal
+  >
+}
+@if (detailOpen()) {
+  <app-detail-page title="Caso sanitario" [busy]="busy()" (dismiss)="closeDetail()">
+    @if (detailLoading()) {
+      <p role="status" class="py-10 text-sm text-stone-500">Cargando caso…</p>
+    }
+    @if (detailError()) {
+      <p role="alert" class="mb-4 text-sm text-red-600">{{ detailError() }}</p>
+    }
+    @if (detail(); as detail) {
+      <p class="text-lg font-medium">{{ label(detail.case.animal) }}</p>
+      <p class="mt-3 break-words text-sm">{{ detail.case.reason }}</p>
+      <div class="my-5 flex flex-wrap gap-4 text-xs text-stone-500">
+        <span>{{ statusLabel(detail.case.status) }}</span
+        ><span>Inicio: {{ detail.case.start_date | date: 'dd/MM/yyyy' : 'UTC' }}</span>
+        @if (detail.case.closed_date) {
+          <span>Cierre: {{ detail.case.closed_date | date: 'dd/MM/yyyy' : 'UTC' }}</span>
+        }
+      </div>
+      @if (detail.case.notes) {
+        <p class="mb-6 break-words whitespace-pre-wrap text-sm text-stone-500">
+          {{ detail.case.notes }}
+        </p>
+      }
+      @if (detail.observations?.length) {
+        <section class="mb-6 border-y border-stone-200 py-5 dark:border-white/10">
+          <h3 class="mb-4 text-sm font-medium">Hallazgos de origen</h3>
+          @for (source of detail.observations; track source.id) {
+            <div
+              class="mb-4 border-l-2 border-stone-300 pl-3 dark:border-white/20"
+              data-source-observation>
+              <p class="text-xs text-stone-500">
+                {{ source.date | date: 'dd/MM/yyyy' : 'UTC' }} · {{ source.recorded_by }}
+              </p>
+              <p class="mt-2 whitespace-pre-wrap break-words text-sm">{{ source.observation }}</p>
+            </div>
+          }
+        </section>
+      }
+      <app-incident-summary [animalId]="detail.case.animal.id" />
+      <app-reaction-summary [animalId]="detail.case.animal.id" />
+      <app-case-followups
+        [caseId]="detail.case.id"
+        [startDate]="detail.case.start_date"
+        [closed]="detail.case.status === 'closed'"
+        [canWrite]="canFollowup()"
+        [entries]="detail.followups || []"
+        (saved)="openDetail(detail.case.id)"
+        (busyChange)="busy.set($event)" />
+      @if (canCases()) {
+        <form
+          [formGroup]="statusForm"
+          (ngSubmit)="updateStatus()"
+          class="mb-7 border-y border-stone-200 py-5 dark:border-white/10">
+          <fieldset [disabled]="busy()" class="min-w-0 space-y-4">
+            <div>
+              <label for="health-status" class="mb-2 block text-xs">Cambiar estado</label
+              ><select
+                id="health-status"
+                formControlName="status"
+                class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+                <option value="open">Abierto</option>
+                <option value="under_treatment">En tratamiento</option>
+                <option value="closed">Cerrado</option>
+              </select>
+            </div>
+            @if (statusForm.controls.status.value === 'closed') {
+              <div>
+                <label for="health-closed-date" class="mb-2 block text-xs">Fecha de cierre *</label
+                ><input
+                  id="health-closed-date"
+                  type="date"
+                  formControlName="closed_date"
+                  [min]="detail.case.start_date"
+                  [max]="today"
+                  class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717] min-w-0" />
+              </div>
+            }
+            @if (detail.case.status === 'closed' && statusForm.controls.status.value !== 'closed') {
+              <p class="text-xs text-stone-500">
+                Al reabrirlo, se quitará la fecha de cierre actual y se conservará el cierre
+                anterior en la actividad.
+              </p>
+            }
+            <button
+              type="submit"
+              [disabled]="busy() || statusForm.controls.status.value === detail.case.status"
+              class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+              {{ busy() ? 'Guardando…' : 'Guardar estado' }}
+            </button>
+          </fieldset>
+        </form>
+      }
+      <section class="mb-7 border-t border-stone-200 pt-5 dark:border-white/10">
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h3 class="text-sm font-medium">Diagnósticos</h3>
+          @if (canDiagnose() && detail.case.status !== 'closed' && !diagnosisOpen()) {
+            <button
+              type="button"
+              data-testid="new-diagnosis"
+              [disabled]="busy()"
+              (click)="openDiagnosis()"
+              class="inline-flex items-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-xs dark:border-white/15">
+              <lucide-icon [img]="plus" [size]="15" /> Agregar diagnóstico
+            </button>
+          }
+        </div>
+        @if (canDiagnose() && detail.case.status === 'closed') {
+          <p class="mb-4 text-xs text-stone-500">Reabre el caso para registrar otro diagnóstico.</p>
+        }
+        @if (diagnosisOpen()) {
+          <form [formGroup]="diagnosisForm" (ngSubmit)="saveDiagnosis()" class="mb-6">
+            <fieldset [disabled]="busy()" class="min-w-0 space-y-4">
+              <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label for="diagnosis-date" class="mb-2 block text-xs">Fecha *</label
+                  ><input
+                    id="diagnosis-date"
+                    type="date"
+                    formControlName="date"
+                    [min]="detail.case.start_date"
+                    [max]="today"
+                    class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717] min-w-0" />
+                </div>
+                <div>
+                  <label for="diagnosis-severity" class="mb-2 block text-xs">Gravedad *</label
+                  ><select
+                    id="diagnosis-severity"
+                    formControlName="severity"
+                    class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+                    <option value="mild">Leve</option>
+                    <option value="moderate">Moderada</option>
+                    <option value="severe">Grave</option>
+                    <option value="critical">Crítica</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label for="diagnosis-text" class="mb-2 block text-xs">Diagnóstico *</label
+                ><textarea
+                  id="diagnosis-text"
+                  formControlName="diagnosis"
+                  maxlength="5000"
+                  rows="4"
+                  class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]"
+                  placeholder="Describe el diagnóstico"></textarea>
+              </div>
+              @if (diagnosisForm.invalid && diagnosisForm.touched) {
+                <p role="alert" class="text-sm text-red-600">
+                  Completa la fecha, la gravedad y el diagnóstico.
+                </p>
+              }
+              @if (diagnosisError()) {
+                <p role="alert" class="text-sm text-red-600">{{ diagnosisError() }}</p>
+              }
+              <div class="flex flex-wrap justify-end gap-3">
+                <button type="button" (click)="diagnosisOpen.set(false)" class="px-4 py-3 text-xs">
+                  Cancelar</button
+                ><button
+                  type="submit"
+                  class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+                  {{ busy() ? 'Guardando…' : 'Guardar diagnóstico' }}
+                </button>
+              </div>
+            </fieldset>
+          </form>
+        }
+        <ol class="space-y-5 border-l border-stone-200 pl-4 dark:border-white/10">
+          @for (diagnosis of detail.diagnoses; track diagnosis.id) {
+            <li>
+              <div class="mb-2 flex flex-wrap items-center gap-2 text-xs">
+                <span class="text-stone-500">{{ diagnosis.date | date: 'dd/MM/yyyy' : 'UTC' }}</span
+                ><span
+                  class="rounded-md bg-stone-100 px-2 py-1 dark:bg-white/5"
+                  [class.text-red-600]="
+                    diagnosis.severity === 'critical' || diagnosis.severity === 'severe'
+                  "
+                  >{{ severityLabel(diagnosis.severity) }}</span
+                >
+              </div>
+              <p class="break-words whitespace-pre-wrap text-sm">
+                {{ diagnosis.diagnosis }}
+              </p>
+              <p class="mt-2 text-xs text-stone-500">{{ diagnosis.recorded_by }}</p>
+            </li>
+          } @empty {
+            <li class="text-xs text-stone-500">Todavía no hay diagnósticos en este caso.</li>
+          }
+        </ol>
+      </section>
+      <section class="mb-7 border-t border-stone-200 pt-5 dark:border-white/10">
+        <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h3 class="text-sm font-medium">Tratamientos</h3>
+          @if (canTreat() && detail.case.status !== 'closed' && !treatmentOpen()) {
+            <button
+              type="button"
+              data-testid="new-treatment"
+              [disabled]="busy()"
+              (click)="openTreatment()"
+              class="inline-flex items-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-xs dark:border-white/15">
+              <lucide-icon [img]="plus" [size]="15" /> Agregar tratamiento
+            </button>
+          }
+        </div>
+        @if (canTreat() && detail.case.status === 'closed') {
+          <p class="mb-4 text-xs text-stone-500">Reabre el caso para agregar un tratamiento.</p>
+        }
+        @if (treatmentOpen()) {
+          <form [formGroup]="treatmentForm" (ngSubmit)="saveTreatment()" class="mb-6">
+            <fieldset [disabled]="busy() || treatmentLoading()" class="min-w-0 space-y-4">
+              @if (treatmentLoading()) {
+                <p role="status" class="text-xs text-stone-500">Cargando unidades y vías…</p>
+              }
+              <div>
+                <label for="treatment-product-search" class="mb-2 block text-xs"
+                  >Buscar producto</label
+                >
+                <div class="flex gap-2">
+                  <input
+                    id="treatment-product-search"
+                    type="search"
+                    [value]="productSearch()"
+                    (input)="productSearch.set($any($event.target).value)"
+                    placeholder="Nombre"
+                    class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717] min-w-0" /><button
+                    type="button"
+                    (click)="loadTreatmentProducts()"
+                    [disabled]="productLoading()"
+                    class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+                    Buscar
+                  </button>
+                </div>
+              </div>
+              @if (productLoading()) {
+                <p role="status" class="text-xs text-stone-500">Cargando productos…</p>
+              }
+              @if (productError()) {
+                <p role="alert" class="text-sm text-red-600">{{ productError() }}</p>
+              }
+              <div>
+                <label for="treatment-product" class="mb-2 block text-xs">Producto *</label
+                ><select
+                  id="treatment-product"
+                  formControlName="product_id"
+                  class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+                  <option value="">Selecciona un producto activo</option>
+                  @for (product of treatmentProducts(); track product.id) {
+                    <option [value]="product.id">{{ product.name }}</option>
+                  }
+                </select>
+                <p class="mt-2 text-xs text-stone-500">
+                  Hasta 100 resultados. El catálogo de Productos permite crear o activar los que
+                  necesites.
+                </p>
+              </div>
+              <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label for="treatment-dose" class="mb-2 block text-xs">Dosis *</label
+                  ><input
+                    id="treatment-dose"
+                    type="number"
+                    min="0.001"
+                    max="9999999.999"
+                    step="0.001"
+                    formControlName="dose_value"
+                    class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]" />
+                </div>
+                <div>
+                  <label for="treatment-unit" class="mb-2 block text-xs">Unidad de la dosis *</label
+                  ><select
+                    id="treatment-unit"
+                    formControlName="dose_unit_id"
+                    class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+                    <option [ngValue]="0">Selecciona una unidad</option>
+                    @for (unit of treatmentCatalogs()?.units ?? []; track unit.id) {
+                      <option [ngValue]="unit.id">{{ catalogLabel(unit.code) }}</option>
+                    }
+                  </select>
+                </div>
+                <div>
+                  <label for="treatment-route" class="mb-2 block text-xs"
+                    >Vía de administración *</label
+                  ><select
+                    id="treatment-route"
+                    formControlName="route_id"
+                    class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+                    <option [ngValue]="0">Selecciona una vía</option>
+                    @for (route of treatmentCatalogs()?.routes ?? []; track route.id) {
+                      <option [ngValue]="route.id">
+                        {{ catalogLabel(route.name) }}
+                      </option>
+                    }
+                  </select>
+                </div>
+                <div>
+                  <label for="treatment-frequency" class="mb-2 block text-xs"
+                    >Frecuencia en horas</label
+                  ><input
+                    id="treatment-frequency"
+                    type="number"
+                    min="1"
+                    max="2147483647"
+                    step="1"
+                    formControlName="frequency_hours"
+                    placeholder="Opcional"
+                    class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]" />
+                </div>
+                <div>
+                  <label for="treatment-start" class="mb-2 block text-xs">Fecha de inicio *</label
+                  ><input
+                    id="treatment-start"
+                    type="date"
+                    formControlName="start_date"
+                    [min]="detail.case.start_date"
+                    [max]="today"
+                    class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717] min-w-0" />
+                </div>
+                <div>
+                  <label for="treatment-duration" class="mb-2 block text-xs"
+                    >Duración en días *</label
+                  ><input
+                    id="treatment-duration"
+                    type="number"
+                    min="1"
+                    max="3650"
+                    step="1"
+                    formControlName="duration_days"
+                    class="w-full rounded-lg border border-stone-200 bg-white px-3 py-3 text-sm dark:border-white/15 dark:bg-[#171717]" />
+                </div>
+              </div>
+              @if (
+                lastTreatmentDay(
+                  treatmentForm.controls.start_date.value,
+                  treatmentForm.controls.duration_days.value
+                );
+                as last
+              ) {
+                <p class="text-xs text-stone-500">
+                  Último día: {{ last | date: 'dd/MM/yyyy' : 'UTC' }}.
+                </p>
+              }
+              @if (treatmentForm.invalid && treatmentForm.touched) {
+                <p role="alert" class="text-sm text-red-600">
+                  Completa producto, dosis, unidad, vía, fecha y duración. La dosis admite hasta
+                  tres decimales.
+                </p>
+              }
+              @if (treatmentError()) {
+                <p role="alert" class="text-sm text-red-600">{{ treatmentError() }}</p>
+              }
+              <div class="flex flex-wrap justify-end gap-3">
+                <button type="button" (click)="closeTreatment()" class="px-4 py-3 text-xs">
+                  Cancelar</button
+                ><button
+                  type="submit"
+                  [disabled]="!treatmentCatalogs()"
+                  class="rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+                  {{ busy() ? 'Guardando…' : 'Guardar tratamiento' }}
+                </button>
+              </div>
+            </fieldset>
+          </form>
+        }
+        <ol class="space-y-5 border-l border-stone-200 pl-4 dark:border-white/10">
+          @for (treatment of detail.treatments; track treatment.id + '-' + treatment.product.id) {
+            <li>
+              <p class="text-sm font-medium">{{ treatment.product.name }}</p>
+              @if (treatment.program_name) {
+                <p class="mt-1 text-xs text-stone-500">Programa: {{ treatment.program_name }}</p>
+              }
+              <p class="mt-2 text-sm">
+                {{ treatment.dose_value }} {{ catalogLabel(treatment.dose_unit_code) }} ·
+                {{ catalogLabel(treatment.route_name) }}
+              </p>
+              <p class="mt-2 text-xs text-stone-500">
+                {{ treatment.start_date | date: 'dd/MM/yyyy' : 'UTC' }} al
+                {{ treatment.last_day | date: 'dd/MM/yyyy' : 'UTC' }} ·
+                {{ treatment.duration_days }} días
+                @if (treatment.frequency_hours) {
+                  · Cada {{ treatment.frequency_hours }} horas
+                }
+              </p>
+              <p class="mt-2 text-xs text-stone-500">{{ treatment.recorded_by }}</p>
+              <app-treatment-doses
+                [treatment]="treatment"
+                [canWrite]="canDose() && detail.case.status !== 'closed'"
+                (busyChange)="busy.set($event)" />
+            </li>
+          } @empty {
+            <li class="text-xs text-stone-500">Todavía no hay tratamientos en este caso.</li>
+          }
+        </ol>
+      </section>
+      <h3 class="mb-4 text-sm font-medium">Actividad del caso</h3>
+      <ol class="space-y-4 border-l border-stone-200 pl-4 dark:border-white/10">
+        @for (activity of detail.activity; track $index) {
+          <li>
+            <p class="text-sm">
+              {{
+                activity.previous_status
+                  ? statusLabel(activity.previous_status) +
+                    '
+        → '
+                  : ''
+              }}{{ statusLabel(activity.status) }}
+            </p>
+            <p class="mt-1 text-xs text-stone-500">
+              {{ activity.date | date: 'dd/MM/yyyy HH:mm' }} · {{ activity.recorded_by }}
+            </p>
+            @if (activity.closed_date) {
+              <p class="mt-1 text-xs text-stone-500">
+                Cierre: {{ activity.closed_date | date: 'dd/MM/yyyy' : 'UTC' }}
+              </p>
+            }
+          </li>
+        } @empty {
+          <li class="text-xs text-stone-500">Este caso no tiene actividad registrada.</li>
+        }
+      </ol>
+    }
+  </app-detail-page>
+}
+@if (historyOpen()) {
+  <app-detail-page title="Historial sanitario" (dismiss)="closeHistory()">
+    @if (historyLoading()) {
+      <p role="status" class="py-10 text-sm text-stone-500">Cargando historial…</p>
+    }
+    @if (historyError()) {
+      <p role="alert" class="text-sm text-red-600">{{ historyError() }}</p>
+    }
+    @if (history(); as history) {
+      <p class="mb-6 text-lg font-medium">{{ label(history.animal) }}</p>
+      <h3 class="mb-4 text-sm font-medium">Casos sanitarios</h3>
+      <div class="mb-7 divide-y divide-stone-200 dark:divide-white/10">
+        @for (case of history.cases; track case.id) {
+          <button
+            type="button"
+            (click)="viewHistoryCase(case.id)"
+            class="block w-full py-4 text-left">
+            <p class="break-words text-sm">{{ case.reason }}</p>
+            <p class="mt-2 text-xs text-stone-500">
+              {{ case.start_date | date: 'dd/MM/yyyy' : 'UTC' }} · {{ statusLabel(case.status) }} ·
+              Ver caso
+            </p>
+          </button>
+        } @empty {
+          <p class="text-xs text-stone-500">Sin casos sanitarios.</p>
+        }
+      </div>
+      <app-incident-summary [animalId]="history.animal.id" />
+      <app-reaction-summary [animalId]="history.animal.id" />
+      <app-case-followups
+        caseId=""
+        startDate=""
+        [closed]="true"
+        [entries]="history.followups || []"
+        [showCaseLinks]="true"
+        (viewCase)="viewHistoryCase($event)" />
+      <h3 class="mb-4 text-sm font-medium">Diagnósticos</h3>
+      <ol class="mb-7 space-y-5 border-l border-stone-200 pl-4 dark:border-white/10">
+        @for (diagnosis of history.diagnoses; track diagnosis.id) {
+          <li>
+            <p class="mb-2 text-xs text-stone-500">
+              {{ diagnosis.date | date: 'dd/MM/yyyy' : 'UTC' }} ·
+              {{ severityLabel(diagnosis.severity) }} · {{ diagnosis.recorded_by }}
+            </p>
+            <p class="break-words whitespace-pre-wrap text-sm">
+              {{ diagnosis.diagnosis }}
+            </p>
+            <button
+              type="button"
+              (click)="viewHistoryCase(diagnosis.health_case_id)"
+              class="mt-2 text-xs text-green-900 underline dark:text-green-300">
+              Ver caso
+            </button>
+          </li>
+        } @empty {
+          <li class="text-xs text-stone-500">Sin diagnósticos.</li>
+        }
+      </ol>
+      <h3 class="mb-4 text-sm font-medium">Tratamientos</h3>
+      <ol class="mb-7 space-y-5 border-l border-stone-200 pl-4 dark:border-white/10">
+        @for (treatment of history.treatments; track treatment.id + '-' + treatment.product.id) {
+          <li>
+            <p class="text-sm font-medium">{{ treatment.product.name }}</p>
+            @if (treatment.program_name) {
+              <p class="mt-1 text-xs text-stone-500">Programa: {{ treatment.program_name }}</p>
+            }
+            <p class="mt-2 text-xs text-stone-500">
+              {{ treatment.start_date | date: 'dd/MM/yyyy' : 'UTC' }} al
+              {{ treatment.last_day | date: 'dd/MM/yyyy' : 'UTC' }} · {{ treatment.dose_value }}
+              {{ catalogLabel(treatment.dose_unit_code) }} ·
+              {{ catalogLabel(treatment.route_name) }}
+            </p>
+            <p class="mt-2 text-xs text-stone-500">{{ treatment.recorded_by }}</p>
+            <app-treatment-doses [treatment]="treatment" />
+            @if (treatment.health_case_id) {
+              <button
+                type="button"
+                (click)="viewHistoryCase(treatment.health_case_id)"
+                class="mt-2 text-xs text-green-900 underline dark:text-green-300">
+                Ver caso
+              </button>
+            }
+          </li>
+        } @empty {
+          <li class="text-xs text-stone-500">Sin tratamientos.</li>
+        }
+      </ol>
+      <h3 class="mb-4 text-sm font-medium">Observaciones</h3>
+      <ol class="space-y-5 border-l border-stone-200 pl-4 dark:border-white/10">
+        @for (observation of history.observations; track observation.id) {
+          <li>
+            <p class="mb-2 text-xs text-stone-500">
+              {{ observation.date | date: 'dd/MM/yyyy' : 'UTC' }} · {{ observation.recorded_by }}
+            </p>
+            <p class="break-words whitespace-pre-wrap text-sm">
+              {{ observation.observation }}
+            </p>
+          </li>
+        } @empty {
+          <li class="text-xs text-stone-500">Sin observaciones.</li>
+        }
+      </ol>
+    }
+  </app-detail-page>
+}
+
+@if (sourceObservation(); as source) {
+  <app-observation-case
+    [observation]="source"
+    (dismiss)="sourceObservation.set(null)"
+    (linked)="sourceLinked($event)" />
+}

@@ -1,0 +1,38 @@
+<a
+  class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-2 focus:z-50 focus:rounded-lg focus:bg-white focus:p-3 focus:text-green-950"
+  href="#dashboard-content"
+  >Ir al contenido</a
+>
+<app-header
+  class="sticky top-0 z-30 block"
+  [userName]="session.user()?.name ?? null"
+  [photoUrl]="session.photoUrl()"
+  [signedIn]="session.user() !== null"
+  (logout)="logout()" />
+<div class="flex min-h-[calc(100dvh-80px)] flex-col md:grid md:grid-cols-[240px_minmax(0,1fr)]">
+  <button
+    class="flex cursor-pointer items-center gap-2 border-b border-stone-200 bg-white px-5 py-3 text-sm dark:border-white/10 dark:bg-[#171717] md:hidden"
+    type="button"
+    aria-controls="dashboard-sidebar"
+    [attr.aria-expanded]="sidebarOpen()"
+    (click)="sidebarOpen.set(!sidebarOpen())">
+    <lucide-icon [img]="sidebarOpen() ? closeIcon : menuIcon" [size]="20" aria-hidden="true" />
+    {{ sidebarOpen() ? 'Cerrar menú' : 'Menú' }}
+  </button>
+  <aside
+    id="dashboard-sidebar"
+    class="border-b border-stone-200 dark:border-white/10 md:sticky md:top-[81px] md:block md:h-[calc(100dvh-81px)] md:w-[240px] md:self-start md:overflow-hidden md:border-r md:border-b-0"
+    [class.hidden]="!sidebarOpen()">
+    <app-sidebar class="block h-full" (navigate)="sidebarOpen.set(false)" />
+  </aside>
+  <main id="dashboard-content" class="min-w-0 p-5 sm:p-8 lg:p-10" tabindex="-1">
+    @if (logoutError()) {
+      <p
+        role="alert"
+        class="mb-4 rounded-lg bg-red-50 p-4 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">
+        {{ logoutError() }}
+      </p>
+    }
+    <router-outlet />
+  </main>
+</div>

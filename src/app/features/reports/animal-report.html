@@ -1,0 +1,199 @@
+<div class="mx-auto max-w-6xl">
+  <div
+    class="flex flex-wrap items-end justify-between gap-4 border-b border-stone-200 pb-8 dark:border-white/10">
+    <div>
+      <p class="mb-3 text-xs text-stone-500">Mi rancho / Reportes</p>
+      <h1 class="text-2xl font-medium tracking-tight sm:text-3xl">Reporte de animales</h1>
+      <p class="mt-3 text-sm text-stone-500">
+        Consulta el hato y descarga los resultados en Excel.
+      </p>
+    </div>
+    @if (allowed) {
+      <button
+        type="button"
+        (click)="export()"
+        [disabled]="exporting() || loading() || !!error()"
+        class="inline-flex items-center gap-2 rounded-lg bg-green-900 px-4 py-3 text-xs font-medium text-white disabled:opacity-50 dark:bg-stone-100 dark:text-stone-950">
+        <lucide-icon [img]="download" [size]="16" />{{
+          exporting() ? 'Preparando Excel…' : 'Descargar Excel'
+        }}
+      </button>
+    }
+  </div>
+  @if (!allowed) {
+    <p class="py-12 text-sm text-stone-500">
+      No tienes permiso para consultar el reporte de animales.
+    </p>
+  } @else {
+    <form
+      [formGroup]="form"
+      (ngSubmit)="search()"
+      class="my-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <div>
+        <label for="report-search" class="mb-2 block text-xs">Nombre o SINIIGA</label
+        ><input
+          id="report-search"
+          formControlName="q"
+          maxlength="100"
+          class="w-full rounded-lg border border-stone-200 bg-white p-3 text-sm dark:border-white/15 dark:bg-[#171717]" />
+      </div>
+      <div>
+        <label for="report-status" class="mb-2 block text-xs">Estado</label
+        ><select
+          id="report-status"
+          formControlName="status"
+          class="w-full rounded-lg border border-stone-200 bg-white p-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+          <option value="active">Activos</option>
+          <option value="exited">Bajas</option>
+          <option value="all">Todos</option>
+        </select>
+      </div>
+      <div>
+        <label for="report-sex" class="mb-2 block text-xs">Sexo</label
+        ><select
+          id="report-sex"
+          formControlName="sex"
+          class="w-full rounded-lg border border-stone-200 bg-white p-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+          <option value="">Todos</option>
+          <option value="female">Hembras</option>
+          <option value="male">Machos</option>
+        </select>
+      </div>
+      <div>
+        <label for="report-breed" class="mb-2 block text-xs">Raza</label
+        ><select
+          id="report-breed"
+          formControlName="breed_id"
+          class="w-full rounded-lg border border-stone-200 bg-white p-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+          <option value="">Todas</option>
+          @for (b of options().breeds; track b.id) {
+            <option [value]="b.id">{{ b.name }}</option>
+          }
+        </select>
+      </div>
+      <div>
+        <label for="report-group" class="mb-2 block text-xs">Lote actual</label
+        ><select
+          id="report-group"
+          formControlName="group_id"
+          class="w-full rounded-lg border border-stone-200 bg-white p-3 text-sm dark:border-white/15 dark:bg-[#171717]">
+          <option value="">Todos</option>
+          @for (g of options().groups; track g.id) {
+            <option [value]="g.id">{{ g.name }}</option>
+          }
+        </select>
+      </div>
+      <div class="flex flex-wrap items-center gap-4 sm:col-span-2 lg:col-span-5">
+        <button
+          type="submit"
+          class="shrink-0 rounded-lg border border-stone-200 px-4 py-2 text-xs dark:border-white/15">
+          Aplicar filtros</button
+        ><button type="button" (click)="reset()" class="text-xs text-stone-500 underline">
+          Limpiar
+        </button>
+        <p class="text-xs text-stone-500">
+          El lote corresponde a la pertenencia actual; no incluye bajas.
+        </p>
+      </div>
+    </form>
+    @if (optionError()) {
+      <p role="alert" class="mb-4 text-sm text-red-600">
+        {{ optionError() }} <button (click)="loadOptions()" class="underline">Reintentar</button>
+      </p>
+    }
+    @if (exportError()) {
+      <p role="alert" class="mb-4 text-sm text-red-600">{{ exportError() }}</p>
+    }
+    @if (error()) {
+      <p role="alert" class="mb-4 text-sm text-red-600">
+        {{ error() }} <button (click)="load()" class="underline">Reintentar</button>
+      </p>
+    } @else if (loading()) {
+      <p role="status" class="py-12 text-sm text-stone-500">Cargando reporte…</p>
+    } @else {
+      <div
+        class="mb-5 flex flex-wrap items-center justify-between gap-3 border-y border-stone-200 py-4 dark:border-white/10">
+        <p class="text-sm">
+          <span class="font-medium">{{ page().total }}</span> animales · {{ page().female }} hembras
+          · {{ page().male }} machos
+        </p>
+        <p class="text-xs text-stone-500">
+          Consulta al {{ page().as_of | date: 'dd/MM/yyyy' : 'UTC' }}
+        </p>
+      </div>
+      <div class="overflow-x-auto rounded-xl border border-stone-200 dark:border-white/10">
+        <table class="w-full text-left text-sm">
+          <thead class="bg-stone-50 text-xs text-stone-500 dark:bg-white/5">
+            <tr>
+              <th class="p-4 font-normal">Identificación / nombre</th>
+              <th class="p-4 font-normal">Sexo</th>
+              <th class="p-4 font-normal">Edad</th>
+              <th class="p-4 font-normal">Razas</th>
+              <th class="p-4 font-normal">Lote actual</th>
+              <th class="p-4 font-normal">Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (a of page().items; track a.id) {
+              <tr
+                [attr.data-animal-id]="a.id"
+                class="border-t border-stone-100 dark:border-white/10">
+                <td class="p-4">
+                  <p class="font-medium">{{ a.name || 'Sin nombre' }}</p>
+                  <p class="mt-1 text-xs text-stone-500">{{ a.siniiga || 'Sin SINIIGA' }}</p>
+                </td>
+                <td class="p-4">{{ a.sex === 'female' ? 'Hembra' : 'Macho' }}</td>
+                <td class="whitespace-nowrap p-4">
+                  <p>{{ age(a.age_months) }}</p>
+                  @if (a.birth_date) {
+                    <p class="mt-1 text-xs text-stone-500">
+                      {{ a.birth_date | date: 'dd/MM/yyyy' : 'UTC' }}
+                    </p>
+                  }
+                </td>
+                <td class="p-4">
+                  @for (b of a.breeds; track b.name) {
+                    <p class="whitespace-nowrap">{{ b.name }} · {{ b.percentage }}%</p>
+                  } @empty {
+                    <span class="text-stone-500">Sin registrar</span>
+                  }
+                </td>
+                <td class="p-4">{{ a.group?.name || 'Sin lote' }}</td>
+                <td class="p-4">
+                  <p>{{ statusLabels[a.status] }}</p>
+                  @if (a.exit_date) {
+                    <p class="mt-1 text-xs text-stone-500">
+                      {{ a.exit_date | date: 'dd/MM/yyyy' : 'UTC' }}
+                    </p>
+                  }
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6" class="p-12 text-center text-stone-500">
+                  No hay animales que coincidan con los filtros.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <div class="mt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-stone-500">
+        <p>El Excel incluye todos los resultados de los filtros aplicados.</p>
+        <div class="flex gap-3">
+          <button
+            (click)="load(page().offset - 25)"
+            [disabled]="page().offset === 0"
+            class="rounded-lg border border-stone-200 px-3 py-2 disabled:opacity-40 dark:border-white/10">
+            Anterior</button
+          ><button
+            (click)="load(page().offset + 25)"
+            [disabled]="page().offset + 25 >= page().total"
+            class="rounded-lg border border-stone-200 px-3 py-2 disabled:opacity-40 dark:border-white/10">
+            Siguiente
+          </button>
+        </div>
+      </div>
+    }
+  }
+</div>
